@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(cuid())
+  email      String?     @unique
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  days       Day[]
+  meals      Meal[]
+  savedMeals SavedMeal[]
+
+  @@index([createdAt])
+}
+
+model Day {
+  id                String   @id @default(cuid())
+  userId            String
+  date              String   // YYYY-MM-DD
+  totalCalories     Float    @default(0)
+  totalProtein      Float    @default(0)
+  totalCarbs        Float    @default(0)
+  totalFat          Float    @default(0)
+  totalSatFat       Float    @default(0)
+  totalFibre        Float    @default(0)
+  totalAddedSugar   Float    @default(0)
+  totalNaturalSugar Float    @default(0)
+  totalSalt         Float    @default(0)
+  totalSteps        Int      @default(0)
+  totalAlcohol      Float    @default(0)
+  totalOmega3       Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meals Meal[]
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model Meal {
+  id           String   @id @default(cuid())
+  userId       String
+  dayId        String
+  name         String
+  calories     Float
+  protein      Float
+  carbs        Float
+  fat          Float
+  satFat       Float
+  fibre        Float
+  addedSugar   Float
+  naturalSugar Float
+  salt         Float
+  alcohol      Float    @default(0)
+  omega3       Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day  Day  @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([dayId])
+  @@index([dayId, createdAt])
+}
+
+model SavedMeal {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  calories     Float
+  protein      Float
+  carbs        Float
+  fat          Float
+  satFat       Float
+  fibre        Float
+  addedSugar   Float
+  naturalSugar Float
+  salt         Float
+  alcohol      Float    @default(0)
+  omega3       Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
