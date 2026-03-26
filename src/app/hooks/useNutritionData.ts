@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { type MealFormValues, USER_ID } from "@/app/types";
+import { type MealFormValues } from "@/app/types";
 
 // ── Shared types ──────────────────────────────────────────────
 
 export type ApiMeal = {
   id: string;
   name: string;
+  category: string | null;
   calories: number;
   protein: number;
   carbs: number;
@@ -42,7 +43,8 @@ export type ApiDay = {
 
 // ── Fetch helpers ─────────────────────────────────────────────
 
-const HEADERS = { "x-user-id": USER_ID, "Content-Type": "application/json" };
+// Session cookie is sent automatically — no need for x-user-id header
+const HEADERS = { "Content-Type": "application/json" };
 
 async function fetchDay(date: string): Promise<ApiDay | null> {
   const res = await fetch(`/api/days?date=${date}`, { headers: HEADERS });
@@ -65,6 +67,7 @@ export type UseNutritionData = {
   addMeal: (date: string, values: MealFormValues) => Promise<void>;
   deleteMeal: (mealId: string, date: string) => Promise<void>;
   updateMeal: (mealId: string, values: MealFormValues, date: string) => Promise<void>;
+  updateSteps: (date: string, steps: number) => Promise<void>;
   refreshDay: (date: string) => Promise<void>;
   refreshAll: () => Promise<void>;
 };
@@ -133,6 +136,15 @@ export function useNutritionData(selectedDate: string): UseNutritionData {
     await refreshDay(date);
   }, [refreshDay]);
 
-  return { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, refreshDay, refreshAll };
+  const updateSteps = useCallback(async (date: string, steps: number) => {
+    await fetch("/api/days", {
+      method: "PATCH",
+      headers: HEADERS,
+      body: JSON.stringify({ date, steps }),
+    });
+    await refreshDay(date);
+  }, [refreshDay]);
+
+  return { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, updateSteps, refreshDay, refreshAll };
 }
 

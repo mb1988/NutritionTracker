@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSavedMealSchema } from "@/server/contracts/savedMeals";
 import { createSavedMeal, listSavedMeals } from "@/server/services/savedMealService";
-import { getUserIdFromRequest, handleApiError } from "@/server/http";
+import { getAuthenticatedUserId, handleApiError } from "@/server/http";
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getAuthenticatedUserId();
     const body = await request.json();
     const parsed = createSavedMealSchema.parse(body);
 
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getAuthenticatedUserId();
     const savedMeals = await listSavedMeals(userId);
 
     return NextResponse.json({ savedMeals }, { status: 200 });
@@ -26,4 +26,3 @@ export async function GET(request: NextRequest) {
     return handleApiError(error);
   }
 }
-

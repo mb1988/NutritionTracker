@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { type MealFormValues } from "@/app/types";
 import { useNutritionData, type ApiDay, type ApiMeal } from "@/app/hooks/useNutritionData";
 import { useGoals }      from "@/app/hooks/useGoals";
@@ -11,7 +12,7 @@ import { MealForm }      from "@/app/components/MealForm";
 import { MealList }      from "@/app/components/MealList";
 import { WeeklyChart }   from "@/app/components/WeeklyChart";
 
-// ── TARGETS (matching old app) ────────────────────────────────
+// ── Targets ───────────────────────────────────────────────────
 const TARGETS = {
   calories:     { label: "Calories",      unit: "kcal", target: 2200, reverse: false },
   addedSugar:   { label: "Added Sugar",   unit: "g",    target: 25,   reverse: false },
@@ -41,8 +42,8 @@ function formatDate(iso: string) {
 
 function getColor(value: number, target: number, reverse: boolean) {
   const pct = value / target;
-  if (reverse) return pct >= 1 ? "#16a34a" : pct >= 0.6 ? "#d97706" : "#dc2626";
-  return pct <= 0.75 ? "#16a34a" : pct <= 1 ? "#d97706" : "#dc2626";
+  if (reverse) return pct >= 1 ? "#1B6E33" : pct >= 0.6 ? "#7B5800" : "#BA1A1A";
+  return pct <= 0.75 ? "#1B6E33" : pct <= 1 ? "#7B5800" : "#BA1A1A";
 }
 
 function getDayScore(day: ApiDay) {
@@ -55,10 +56,10 @@ function getDayScore(day: ApiDay) {
   return good;
 }
 
-function scoreEmoji(score: number) {
-  if (score >= 4) return { e: "🟢", label: "Great day" };
-  if (score >= 3) return { e: "🟡", label: "Decent day" };
-  return { e: "🔴", label: "Tough day" };
+function scoreInfo(score: number): { emoji: string; label: string; cls: string } {
+  if (score >= 4) return { emoji: "🟢", label: "Great day", cls: "score-chip--green" };
+  if (score >= 3) return { emoji: "🟡", label: "Decent day", cls: "score-chip--yellow" };
+  return { emoji: "🔴", label: "Needs work", cls: "score-chip--red" };
 }
 
 // ── Sub-components ────────────────────────────────────────────
@@ -66,19 +67,22 @@ function scoreEmoji(score: number) {
 function MacroBar({ label, value, target, unit, reverse }: {
   label: string; value: number; target: number; unit: string; reverse: boolean;
 }) {
-  const pct  = Math.min((value / target) * 100, 150);
+  const pct   = Math.min((value / target) * 100, 150);
   const color = getColor(value, target, reverse);
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, fontSize: 12 }}>
-        <span style={{ color: "var(--color-text-muted)" }}>{label}</span>
-        <span style={{ color, fontWeight: 700 }}>
-          {Math.round(value * 10) / 10}{unit}
-          <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}> / {target}{unit}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 12 }}>
+        <span style={{ color: "var(--md-on-surface-variant)", fontWeight: 600 }}>{label}</span>
+        <span style={{ color, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+          {Math.round(value * 10) / 10}
+          <span style={{ color: "var(--md-on-surface-variant)", fontWeight: 400 }}> / {target}{unit}</span>
         </span>
       </div>
-      <div style={{ height: 5, background: "var(--color-border)", borderRadius: 99, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: color, borderRadius: 99, transition: "width 0.3s" }} />
+      <div className="progress-bar-track" style={{ height: 6 }}>
+        <div
+          className="progress-bar-fill"
+          style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: color }}
+        />
       </div>
     </div>
   );
@@ -86,81 +90,111 @@ function MacroBar({ label, value, target, unit, reverse }: {
 
 function DayCard({ day, onClick }: { day: ApiDay; onClick: () => void }) {
   const score = getDayScore(day);
-  const { e } = scoreEmoji(score);
+  const { emoji, label, cls } = scoreInfo(score);
   return (
-    <div onClick={onClick} className="card" style={{ padding: "var(--space-3) var(--space-4)", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div
+      onClick={onClick}
+      className="card"
+      style={{
+        padding: "var(--space-4) var(--space-5)",
+        cursor: "pointer",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        transition: "box-shadow var(--transition), transform var(--transition)",
+        borderRadius: "var(--radius-xl)",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-md)";
+        (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-sm)";
+        (e.currentTarget as HTMLElement).style.transform = "none";
+      }}
+    >
       <div>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{formatDate(day.date)}</div>
-        <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>
-          {Math.round(day.totalCalories)} kcal · sugar {Math.round(day.totalAddedSugar)}g added · fibre {Math.round(day.totalFibre)}g
+        <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.015em" }}>{formatDate(day.date)}</div>
+        <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 4, lineHeight: 1.4 }}>
+          {Math.round(day.totalCalories)} kcal &nbsp;·&nbsp;
+          added sugar {Math.round(day.totalAddedSugar)}g &nbsp;·&nbsp;
+          fibre {Math.round(day.totalFibre)}g
         </div>
-        <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+        <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
           {(Object.keys(TARGETS) as TargetKey[]).slice(0, 5).map((k) => {
             const t = TARGETS[k];
             const val = day[`total${k.charAt(0).toUpperCase() + k.slice(1)}` as keyof ApiDay] as number ?? 0;
             const pct = Math.min((val / t.target) * 100, 100);
             const color = getColor(val, t.target, t.reverse);
             return (
-              <div key={k} style={{ height: 3, width: 24, background: "var(--color-border)", borderRadius: 99, overflow: "hidden" }}>
+              <div key={k} style={{ height: 4, width: 28, background: "var(--md-surface-container)", borderRadius: 99, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99 }} />
               </div>
             );
           })}
         </div>
       </div>
-      <div style={{ fontSize: 22 }}>{e}</div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+        <span className={`score-chip ${cls}`}>{emoji} {label}</span>
+        <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>{day.meals.length} meals</span>
+      </div>
     </div>
   );
 }
 
-function DayDetail({ day, onBack, onEdit, onDelete, savedMeals, onSaveTemplate, onDeleteSaved }: {
+function DayDetail({ day, onBack, onEdit, onDelete }: {
   day: ApiDay;
   onBack: () => void;
   onEdit: (meal: ApiMeal) => void;
   onDelete: (mealId: string) => void;
-  savedMeals: ReturnType<typeof useSavedMeals>["savedMeals"];
-  onSaveTemplate: ReturnType<typeof useSavedMeals>["saveMeal"];
-  onDeleteSaved: ReturnType<typeof useSavedMeals>["deleteSavedMeal"];
 }) {
   const score = getDayScore(day);
-  const { e, label } = scoreEmoji(score);
+  const { emoji, label, cls } = scoreInfo(score);
   return (
-    <div>
-      <button onClick={onBack} className="btn-ghost btn-sm" style={{ marginBottom: "var(--space-4)", paddingLeft: 0 }}>
-        ← Back
+    <div className="stack" style={{ gap: "var(--space-4)" }}>
+      <button onClick={onBack} className="btn-ghost btn-sm" style={{ width: "fit-content", paddingLeft: 0 }}>
+        ← Back to history
       </button>
-      <div className="card" style={{ padding: "var(--space-5)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-5)" }}>
-          <div>
-            <h2 style={{ fontSize: "1.25rem" }}>{formatDate(day.date)}</h2>
-            <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
-              {day.meals.length} meals · {day.totalSteps.toLocaleString()} steps
+
+      <div className="card">
+        <div style={{ padding: "var(--space-5)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-5)" }}>
+            <div>
+              <h2 style={{ fontSize: "1.25rem", letterSpacing: "-0.025em" }}>{formatDate(day.date)}</h2>
+              <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 4 }}>
+                {day.meals.length} meal{day.meals.length !== 1 ? "s" : ""}
+                {day.totalSteps > 0 && ` · ${day.totalSteps.toLocaleString()} steps`}
+              </div>
             </div>
+            <span className={`score-chip ${cls}`} style={{ fontSize: 13 }}>{emoji} {label}</span>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 28 }}>{e}</div>
-            <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{label}</div>
+
+          <div className="stack" style={{ gap: "var(--space-2)" }}>
+            {(Object.entries(TARGETS) as [TargetKey, typeof TARGETS[TargetKey]][]).map(([key, cfg]) => {
+              const val = day[`total${key.charAt(0).toUpperCase() + key.slice(1)}` as keyof ApiDay] as number ?? 0;
+              return <MacroBar key={key} label={cfg.label} value={val} target={cfg.target} unit={cfg.unit} reverse={cfg.reverse} />;
+            })}
           </div>
         </div>
-        {(Object.entries(TARGETS) as [TargetKey, typeof TARGETS[TargetKey]][]).map(([key, cfg]) => {
-          const val = day[`total${key.charAt(0).toUpperCase() + key.slice(1)}` as keyof ApiDay] as number ?? 0;
-          return <MacroBar key={key} label={cfg.label} value={val} target={cfg.target} unit={cfg.unit} reverse={cfg.reverse} />;
-        })}
       </div>
+
       {day.meals.length > 0 && (
-        <div className="card" style={{ marginTop: "var(--space-4)", overflow: "hidden" }}>
-          <div className="card-header"><h2>Meals</h2><span className="badge-pill">{day.meals.length}</span></div>
+        <div className="card" style={{ overflow: "hidden" }}>
+          <div className="card-header">
+            <h2>Meals</h2>
+            <span className="badge-pill">{day.meals.length}</span>
+          </div>
           {day.meals.map((m) => (
-            <div key={m.id} style={{ padding: "var(--space-3) var(--space-4)", borderBottom: "1px solid var(--color-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div key={m.id} style={{ padding: "var(--space-3) var(--space-5)", borderBottom: "1px solid var(--md-outline-variant)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{m.name}</div>
-                <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: "-0.015em" }}>{m.name}</div>
+                <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 2 }}>
                   {Math.round(m.calories)} kcal · sat fat {m.satFat}g · added sugar {m.addedSugar}g
                 </div>
               </div>
               <div style={{ display: "flex", gap: 4 }}>
-                <button className="btn-ghost btn-sm" onClick={() => onEdit(m)}>Edit</button>
-                <button className="btn-danger-ghost btn-sm" onClick={() => onDelete(m.id)}>Del</button>
+                <button className="btn-ghost btn-sm" onClick={() => onEdit(m)}>✏️</button>
+                <button className="btn-danger-ghost btn-sm" onClick={() => onDelete(m.id)}>🗑</button>
               </div>
             </div>
           ))}
@@ -170,23 +204,39 @@ function DayDetail({ day, onBack, onEdit, onDelete, savedMeals, onSaveTemplate, 
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────
+// ── Loading Skeleton ──────────────────────────────────────────
+function PageSkeleton() {
+  return (
+    <div className="page-wrapper">
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <div className="skeleton" style={{ width: 32, height: 32, borderRadius: 8 }} />
+        <div className="skeleton" style={{ width: 180, height: 28, borderRadius: 8 }} />
+      </div>
+      <div className="skeleton" style={{ width: 180, height: 40, borderRadius: 99, marginBottom: 24 }} />
+      <div className="skeleton" style={{ height: 72, borderRadius: 24, marginBottom: 20 }} />
+      <div className="skeleton" style={{ height: 260, borderRadius: 24, marginBottom: 20 }} />
+      <div className="skeleton" style={{ height: 200, borderRadius: 24, marginBottom: 20 }} />
+      <div className="skeleton" style={{ height: 320, borderRadius: 24 }} />
+    </div>
+  );
+}
 
+// ── Main Page ─────────────────────────────────────────────────
 type Tab = "today" | "history";
 
 export default function HomePage() {
+  const { data: session } = useSession();
   const [tab,          setTab]          = useState<Tab>("today");
   const [selectedDate, setSelectedDate] = useState(todayISO());
   const [historyDay,   setHistoryDay]   = useState<ApiDay | null>(null);
   const [editingMeal,  setEditingMeal]  = useState<ApiMeal | null>(null);
 
-  const { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal } =
+  const { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, updateSteps } =
     useNutritionData(selectedDate);
 
   const { goals, updateGoals }                    = useGoals();
   const { savedMeals, saveMeal, deleteSavedMeal } = useSavedMeals();
 
-  // Build DaySnapshot from API day for existing components
   const totals = selectedDay
     ? {
         calories:     selectedDay.totalCalories,
@@ -202,7 +252,8 @@ export default function HomePage() {
         omega3:       selectedDay.totalOmega3,
         steps:        selectedDay.totalSteps,
       }
-    : { calories: 0, protein: 0, carbs: 0, fat: 0, satFat: 0, fibre: 0, addedSugar: 0, naturalSugar: 0, salt: 0, alcohol: 0, omega3: 0, steps: 0 };
+    : { calories: 0, protein: 0, carbs: 0, fat: 0, satFat: 0, fibre: 0,
+        addedSugar: 0, naturalSugar: 0, salt: 0, alcohol: 0, omega3: 0, steps: 0 };
 
   const mealsForChart = allDays.flatMap((d) =>
     d.meals.map((m) => ({ ...m, date: d.date })),
@@ -239,37 +290,64 @@ export default function HomePage() {
     [deleteMeal, historyDay],
   );
 
-  if (loading) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)" }}>
-      Loading…
-    </div>
-  );
+  if (loading) return <PageSkeleton />;
 
   return (
     <div className="page-wrapper">
-      <header className="page-header">
-        <h1>Nutrition</h1>
-        <span className="subtitle">Tracker</span>
+      {/* Header */}
+      <header className="page-header" style={{ justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <div style={{ fontSize: 28 }}>🥗</div>
+          <div>
+            <h1>Nutrition</h1>
+            <div className="subtitle">Daily tracker</div>
+          </div>
+        </div>
+
+        {/* User info + sign out */}
+        {session?.user && (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            {session.user.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={session.user.image}
+                alt={session.user.name ?? "User"}
+                style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid var(--md-outline-variant)" }}
+              />
+            )}
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="btn-ghost btn-sm"
+              title="Sign out"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
       </header>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-5)" }}>
+      {/* Tab bar */}
+      <div className="tab-bar">
         {(["today", "history"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => { setTab(t); setHistoryDay(null); setEditingMeal(null); }}
-            className={tab === t ? "btn-primary btn-sm" : "btn-ghost btn-sm"}
-            style={{ textTransform: "capitalize" }}
+            className={tab === t ? "active" : ""}
           >
-            {t === "today" ? "Today" : `History (${allDays.length})`}
+            {t === "today" ? "Today" : `History${allDays.length > 0 ? ` (${allDays.length})` : ""}`}
           </button>
         ))}
       </div>
 
       {/* TODAY tab */}
       {tab === "today" && (
-        <>
-          <DatePicker date={selectedDate} onChange={(d) => { setSelectedDate(d); setEditingMeal(null); }} />
+        <div className="stack" style={{ gap: "var(--space-5)" }}>
+          <DatePicker
+            date={selectedDate}
+            steps={selectedDay?.totalSteps ?? 0}
+            onChange={(d) => { setSelectedDate(d); setEditingMeal(null); }}
+            onStepsSave={(steps) => updateSteps(selectedDate, steps)}
+          />
 
           <DayTotals
             totals={totals}
@@ -289,7 +367,8 @@ export default function HomePage() {
             <MealForm
               key={editingMeal.id}
               initialValues={{
-                name: editingMeal.name, calories: editingMeal.calories,
+                name: editingMeal.name, category: editingMeal.category,
+                calories: editingMeal.calories,
                 protein: editingMeal.protein, carbs: editingMeal.carbs,
                 fat: editingMeal.fat, satFat: editingMeal.satFat,
                 fibre: editingMeal.fibre, addedSugar: editingMeal.addedSugar,
@@ -314,7 +393,7 @@ export default function HomePage() {
             onEdit={(meal) => { setEditingMeal(meal as ApiMeal); window.scrollTo({ top: 0, behavior: "smooth" }); }}
             onDelete={handleDelete}
           />
-        </>
+        </div>
       )}
 
       {/* HISTORY tab */}
@@ -325,21 +404,22 @@ export default function HomePage() {
             onBack={() => setHistoryDay(null)}
             onEdit={setEditingMeal}
             onDelete={handleHistoryDelete}
-            savedMeals={savedMeals}
-            onSaveTemplate={saveMeal}
-            onDeleteSaved={deleteSavedMeal}
           />
         ) : (
           <div>
-            <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "var(--space-3)" }}>
+            <div className="section-label" style={{ marginBottom: "var(--space-3)" }}>
               All Logged Days ({allDays.length})
             </div>
             {allDays.length === 0 ? (
-              <div className="card" style={{ padding: "var(--space-12)", textAlign: "center", color: "var(--color-text-muted)" }}>
-                No days logged yet
+              <div className="card" style={{ padding: "var(--space-12)", textAlign: "center" }}>
+                <div style={{ fontSize: "3rem", marginBottom: "var(--space-3)" }}>📅</div>
+                <p style={{ fontWeight: 700, marginBottom: 6 }}>No days logged yet</p>
+                <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)" }}>
+                  Start logging meals on the Today tab.
+                </p>
               </div>
             ) : (
-              <div className="stack" style={{ gap: "var(--space-2)" }}>
+              <div className="stack" style={{ gap: "var(--space-3)" }}>
                 {allDays.map((d) => (
                   <DayCard key={d.date} day={d} onClick={() => setHistoryDay(d)} />
                 ))}

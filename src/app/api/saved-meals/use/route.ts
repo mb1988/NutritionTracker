@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { useSavedMealSchema } from "@/server/contracts/savedMeals";
 import { useSavedMeal } from "@/server/services/savedMealService";
-import { getUserIdFromRequest, handleApiError } from "@/server/http";
+import { getAuthenticatedUserId, handleApiError } from "@/server/http";
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getAuthenticatedUserId();
     const body = await request.json();
     const parsed = useSavedMealSchema.parse(body);
 
@@ -15,4 +15,3 @@ export async function POST(request: NextRequest) {
     return handleApiError(error);
   }
 }
-

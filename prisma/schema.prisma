@@ -10,6 +10,8 @@ datasource db {
 model User {
   id         String      @id @default(cuid())
   email      String?     @unique
+  name       String?
+  image      String?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   days       Day[]
@@ -61,6 +63,7 @@ model Meal {
   salt         Float
   alcohol      Float    @default(0)
   omega3       Float    @default(0)
+  category     String?  // Breakfast | Lunch | Dinner | Snack | Other — null for legacy meals
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -87,6 +90,7 @@ model SavedMeal {
   salt         Float
   alcohol      Float    @default(0)
   omega3       Float    @default(0)
+  category     String?  // mirrors Meal.category
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

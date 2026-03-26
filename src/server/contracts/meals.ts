@@ -1,17 +1,22 @@
 import { z } from "zod";
 import { dateStringSchema, nutritionInputSchema } from "@/server/contracts/common";
 
+export const MEAL_CATEGORIES = ["Breakfast", "Lunch", "Dinner", "Snack", "Other"] as const;
+export type MealCategory = typeof MEAL_CATEGORIES[number];
+
+const categorySchema = z.enum(MEAL_CATEGORIES).nullable().optional();
+
 export const createMealSchema = z.object({
-  date: dateStringSchema,
-  name: z.string().trim().min(1).max(120),
+  date:     dateStringSchema,
+  name:     z.string().trim().min(1).max(120),
+  category: categorySchema,
   ...nutritionInputSchema.shape,
 });
 
-// .partial() makes every nutrition field optional but preserves all validators
-// (min(0), lt(10000)) — constraints still fire whenever a field IS present.
 export const updateMealSchema = z
   .object({
-    name: z.string().trim().min(1).max(120).optional(),
+    name:     z.string().trim().min(1).max(120).optional(),
+    category: categorySchema,
     ...nutritionInputSchema.partial().shape,
   })
   .refine((value) => Object.keys(value).length > 0, {

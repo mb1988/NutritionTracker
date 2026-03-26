@@ -46,7 +46,7 @@ export function WeeklyChart({ allMeals, selectedDate, goals, onSelectDate }: Pro
   const days = getLast7Days();
 
   const data = days.map((date) => {
-    const meals = allMeals.filter((m) => m.date === date);
+    const meals    = allMeals.filter((m) => m.date === date);
     const calories = meals.reduce((sum, m) => sum + m.calories, 0);
     return { date, label: shortDay(date), calories };
   });
@@ -60,21 +60,24 @@ export function WeeklyChart({ allMeals, selectedDate, goals, onSelectDate }: Pro
   return (
     <div className="card weekly-chart">
       <div className="card-header">
-        <h2>Last 7 Days</h2>
+        <h2>7-Day Overview</h2>
         <span className="badge-pill">kcal</span>
       </div>
       <div style={{ padding: "var(--space-4) var(--space-5) var(--space-5)" }}>
         <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={data} barCategoryGap="30%">
-            <CartesianGrid vertical={false} stroke="var(--color-border)" strokeDasharray="3 3" />
+          <BarChart data={data} barCategoryGap="30%" margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+            <CartesianGrid vertical={false} stroke="var(--md-outline-variant)" strokeDasharray="3 3" />
             <XAxis
               dataKey="label"
               axisLine={false}
               tickLine={false}
-              tick={{ fontSize: 11, fill: "var(--color-text-muted)", fontWeight: 600 }}
+              tick={{ fontSize: 11, fill: "var(--md-on-surface-variant)", fontWeight: 600, fontFamily: "Inter, sans-serif" }}
             />
             <YAxis hide />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--color-surface-raised)" }} />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ fill: "var(--md-surface-container-low)", rx: 6 }}
+            />
             <ReferenceLine
               y={goals.calories}
               stroke="var(--color-danger)"
@@ -83,8 +86,8 @@ export function WeeklyChart({ allMeals, selectedDate, goals, onSelectDate }: Pro
             />
             <Bar
               dataKey="calories"
-              radius={[4, 4, 0, 0]}
-              maxBarSize={40}
+              radius={[6, 6, 0, 0]}
+              maxBarSize={44}
               style={{ cursor: "pointer" }}
               onClick={handleBarClick}
             >
@@ -93,10 +96,10 @@ export function WeeklyChart({ allMeals, selectedDate, goals, onSelectDate }: Pro
                   key={entry.date}
                   fill={
                     entry.date === selectedDate
-                      ? "var(--color-accent)"
+                      ? "var(--md-primary)"
                       : entry.calories > goals.calories
                       ? "var(--color-danger)"
-                      : "var(--color-accent-light)"
+                      : "var(--md-primary-container)"
                   }
                   stroke={entry.date === selectedDate ? "var(--color-accent-hover)" : "none"}
                   strokeWidth={entry.date === selectedDate ? 1.5 : 0}
@@ -105,9 +108,9 @@ export function WeeklyChart({ allMeals, selectedDate, goals, onSelectDate }: Pro
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-        <p className="chart-legend">
-          <span className="chart-legend__dot" style={{ background: "var(--color-danger)" }} />
-          <span>Goal line {goals.calories} kcal. Click a bar to navigate.</span>
+        <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "var(--md-on-surface-variant)", marginTop: 8 }}>
+          <span style={{ display: "inline-block", width: 20, height: 3, borderRadius: 9999, background: "var(--color-danger)", opacity: 0.8 }} />
+          Goal: {goals.calories} kcal · tap a bar to navigate
         </p>
       </div>
     </div>

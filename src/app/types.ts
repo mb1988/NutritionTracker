@@ -2,6 +2,7 @@ export type LocalMeal = {
   id: string;
   date: string; // YYYY-MM-DD
   name: string;
+  category: string | null;
   calories: number;
   protein: number;
   carbs: number;
@@ -35,6 +36,7 @@ export type DaySnapshot = {
 export type SavedMeal = {
   id: string;
   name: string;
+  category: string | null;
   calories: number;
   protein: number;
   carbs: number;
@@ -58,7 +60,7 @@ export type DailyGoals = {
 };
 
 export const DEFAULT_GOALS: DailyGoals = {
-  calories: 2000,
+  calories: 2200,
   protein: 150,
   carbs: 200,
   fat: 65,
@@ -68,6 +70,7 @@ export const DEFAULT_GOALS: DailyGoals = {
 
 export const EMPTY_FORM_VALUES: MealFormValues = {
   name: "",
+  category: null,
   calories: 0,
   protein: 0,
   carbs: 0,
