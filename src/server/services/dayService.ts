@@ -86,6 +86,17 @@ export async function getDayByDate(userId: string, date: string) {
   });
 }
 
+/** Updates (or creates) the steps count for a day. */
+export async function updateDaySteps(userId: string, date: string, steps: number) {
+  validateDate(date);
+  return prisma.day.upsert({
+    where:  { userId_date: { userId, date } },
+    update: { totalSteps: steps },
+    create: { userId, date, totalSteps: steps },
+    include: { meals: { orderBy: { createdAt: "asc" } } },
+  });
+}
+
 /** Returns all days for a user, ordered newest first (no meals included). */
 export async function getAllDays(userId: string) {
   return prisma.day.findMany({

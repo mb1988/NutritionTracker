@@ -1,13 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import { ZodError } from "zod";
 import { AppError } from "@/server/errors";
+import { authOptions } from "@/lib/auth";
 
-export function getUserIdFromRequest(request: NextRequest): string {
-  const userId = request.headers.get("x-user-id");
-  if (!userId) {
-    throw new AppError("Missing x-user-id header", 401);
+/**
+ * Returns the authenticated DB user ID from the session.
+ * Throws 401 if not authenticated.
+ */
+export async function getAuthenticatedUserId(): Promise<string> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new AppError("Not authenticated", 401);
   }
-  return userId;
+  return session.user.id;
 }
 
 export function handleApiError(error: unknown): NextResponse {
@@ -25,4 +31,3 @@ export function handleApiError(error: unknown): NextResponse {
   console.error(error);
   return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 }
-

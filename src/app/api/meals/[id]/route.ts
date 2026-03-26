@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mealIdParamSchema, updateMealSchema } from "@/server/contracts/meals";
 import { deleteMeal, updateMeal } from "@/server/services/mealService";
-import { getUserIdFromRequest, handleApiError } from "@/server/http";
+import { getAuthenticatedUserId, handleApiError } from "@/server/http";
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getAuthenticatedUserId();
     const params = mealIdParamSchema.parse(await context.params);
     const body = await request.json();
     const parsed = updateMealSchema.parse(body);
@@ -19,7 +19,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getAuthenticatedUserId();
     const params = mealIdParamSchema.parse(await context.params);
 
     const result = await deleteMeal(userId, params.id);
@@ -28,4 +28,3 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     return handleApiError(error);
   }
 }
-

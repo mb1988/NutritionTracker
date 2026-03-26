@@ -17,6 +17,7 @@ export type CreateMealInput = NutritionFields & {
   /** Calendar date in YYYY-MM-DD format. */
   date: string;
   name: string;
+  category?: string | null;
 };
 
 export type UpdateMealInput = Partial<Omit<CreateMealInput, "date">>;
@@ -149,6 +150,7 @@ export async function createMeal(
           userId,
           dayId:        day.id,
           name:         input.name,
+          category:     input.category ?? null,
           calories:     input.calories,
           protein:      input.protein,
           carbs:        input.carbs,
@@ -188,6 +190,7 @@ export async function updateMeal(
         where: { id: meal.id },
         data: {
           ...(input.name         !== undefined && { name:         input.name }),
+          ...(input.category     !== undefined && { category:     input.category }),
           ...(input.calories     !== undefined && { calories:     input.calories }),
           ...(input.protein      !== undefined && { protein:      input.protein }),
           ...(input.carbs        !== undefined && { carbs:        input.carbs }),

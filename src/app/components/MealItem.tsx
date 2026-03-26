@@ -9,21 +9,51 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
+const KCAL_COLOR = "var(--macro-calories)";
+
+const CATEGORY_ICONS: Record<string, string> = {
+  Breakfast: "🌅",
+  Lunch:     "🥗",
+  Dinner:    "🍽️",
+  Snack:     "🍎",
+  Other:     "☕",
+};
+
 export function MealItem({ meal, onEdit, onDelete }: Props) {
   return (
     <div className="meal-item">
-      {/* Body */}
       <div className="meal-item__body">
-        <span className="meal-item__name">{meal.name}</span>
+        {/* Name + category chip */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          <span className="meal-item__name">{meal.name}</span>
+          {meal.category && (
+            <span style={{
+              fontSize: "0.6875rem",
+              fontWeight: 700,
+              background: "var(--md-surface-container)",
+              border: "1px solid var(--md-outline-variant)",
+              borderRadius: "var(--radius-full)",
+              padding: "2px 8px",
+              color: "var(--md-on-surface-variant)",
+              whiteSpace: "nowrap",
+            }}>
+              {CATEGORY_ICONS[meal.category] ?? ""} {meal.category}
+            </span>
+          )}
+        </div>
 
-        {/* Primary macros */}
+        {/* Primary macros row */}
         <div className="meal-item__macros-primary">
-          <MacroBadge
-            label=""
-            value={meal.calories}
-            unit=" kcal"
-            color="var(--macro-calories)"
-          />
+          <span
+            style={{
+              fontSize: "0.9375rem",
+              fontWeight: 700,
+              color: KCAL_COLOR,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {Math.round(meal.calories)} kcal
+          </span>
           <MacroBadge
             label="P"
             value={meal.protein}
@@ -37,15 +67,32 @@ export function MealItem({ meal, onEdit, onDelete }: Props) {
           <MacroBadge label="F" value={meal.fat} color="var(--macro-fat)" />
         </div>
 
-        {/* Secondary macros */}
+        {/* Secondary macros row */}
         <div className="meal-item__macros-secondary">
-          <MacroBadge label="Sat fat" value={meal.satFat} dim />
-          <MacroBadge label="Fibre" value={meal.fibre} color="var(--macro-fiber)" dim />
-          <MacroBadge label="Added sugar" value={meal.addedSugar} dim />
-          <MacroBadge label="Nat. sugar" value={meal.naturalSugar} dim />
-          <MacroBadge label="Salt" value={meal.salt} dim />
-          {meal.alcohol > 0 && <MacroBadge label="Alcohol" value={meal.alcohol} unit="u" dim />}
-          {meal.omega3 > 0 && <MacroBadge label="Omega-3" value={meal.omega3} unit="mg" dim />}
+          {meal.satFat > 0 && (
+            <MacroBadge label="Sat fat" value={meal.satFat} dim />
+          )}
+          {meal.fibre > 0 && (
+            <MacroBadge
+              label="Fibre"
+              value={meal.fibre}
+              color="var(--macro-fiber)"
+              dim
+            />
+          )}
+          {meal.addedSugar > 0 && (
+            <MacroBadge label="Added sugar" value={meal.addedSugar} dim />
+          )}
+          {meal.naturalSugar > 0 && (
+            <MacroBadge label="Nat. sugar" value={meal.naturalSugar} dim />
+          )}
+          {meal.salt > 0 && <MacroBadge label="Salt" value={meal.salt} dim />}
+          {meal.alcohol > 0 && (
+            <MacroBadge label="Alcohol" value={meal.alcohol} unit="u" dim />
+          )}
+          {meal.omega3 > 0 && (
+            <MacroBadge label="Omega-3" value={meal.omega3} unit="mg" dim />
+          )}
         </div>
       </div>
 
@@ -55,7 +102,7 @@ export function MealItem({ meal, onEdit, onDelete }: Props) {
           className="btn-ghost btn-sm"
           onClick={() => onEdit(meal)}
           aria-label={`Edit ${meal.name}`}
-          title="Edit"
+          title="Edit meal"
         >
           ✏️
         </button>
@@ -63,7 +110,7 @@ export function MealItem({ meal, onEdit, onDelete }: Props) {
           className="btn-danger-ghost btn-sm"
           onClick={() => onDelete(meal.id)}
           aria-label={`Delete ${meal.name}`}
-          title="Delete"
+          title="Delete meal"
         >
           🗑
         </button>
