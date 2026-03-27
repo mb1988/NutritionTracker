@@ -8,8 +8,8 @@ describe("calculateDayTotals", () => {
 
   it("sums all nutrition fields correctly", () => {
     const result = calculateDayTotals([
-      { calories: 550, protein: 35, carbs: 45, fat: 23, satFat: 8,  fibre: 5, addedSugar: 4,  naturalSugar: 6,  salt: 0.8 },
-      { calories: 450, protein: 25, carbs: 40, fat: 17, satFat: 5,  fibre: 3, addedSugar: 2,  naturalSugar: 8,  salt: 0.6 },
+      { calories: 550, protein: 35, carbs: 45, fat: 23, satFat: 8,  fibre: 5, addedSugar: 4,  naturalSugar: 6,  salt: 0.8, alcohol: 1,   omega3: 120 },
+      { calories: 450, protein: 25, carbs: 40, fat: 17, satFat: 5,  fibre: 3, addedSugar: 2,  naturalSugar: 8,  salt: 0.6, alcohol: 0.5, omega3: 80 },
     ]);
 
     expect(result).toEqual({
@@ -22,11 +22,13 @@ describe("calculateDayTotals", () => {
       addedSugar:   6,
       naturalSugar: 14,
       salt:         1.4,
+      alcohol:      1.5,
+      omega3:       200,
     });
   });
 
   it("is not sensitive to floating-point order (re-aggregates each call)", () => {
-    const meal = { calories: 100, protein: 10, carbs: 10, fat: 5, satFat: 2, fibre: 1, addedSugar: 1, naturalSugar: 1, salt: 0.1 };
+    const meal = { calories: 100, protein: 10, carbs: 10, fat: 5, satFat: 2, fibre: 1, addedSugar: 1, naturalSugar: 1, salt: 0.1, alcohol: 0, omega3: 0 };
     const a = calculateDayTotals([meal, meal]);
     const b = calculateDayTotals([meal, meal, meal]);
     expect(b.calories).toBe(300);

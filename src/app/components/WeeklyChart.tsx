@@ -4,12 +4,14 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine, CartesianGrid,
 } from "recharts";
-import { type LocalMeal, type DailyGoals } from "@/app/types";
+import { NUTRITION_METRICS, type DailyGoals, type SelectableMetricKey } from "@/app/types";
+import { type ApiDay } from "@/app/hooks/useNutritionData";
 
 type Props = {
-  allMeals:     LocalMeal[];
+  allDays: ApiDay[];
   selectedDate: string;
-  goals:        DailyGoals;
+  goals: DailyGoals;
+  metric: SelectableMetricKey;
   onSelectDate: (date: string) => void;
 };
 
@@ -28,27 +30,46 @@ function shortDay(iso: string): string {
   return d.toLocaleDateString("en-GB", { weekday: "short" });
 }
 
-const CustomTooltip = ({ active, payload, label }: {
+const CustomTooltip = ({ active, payload, label, metric }: {
   active?: boolean;
   payload?: { value: number }[];
   label?: string;
+  metric?: SelectableMetricKey;
 }) => {
   if (!active || !payload?.length) return null;
+  const unit = metric ? NUTRITION_METRICS[metric].unit : "";
+  const value = payload[0].value;
   return (
     <div className="chart-tooltip">
       <p className="chart-tooltip__label">{label}</p>
-      <p className="chart-tooltip__value">{Math.round(payload[0].value)} kcal</p>
+      <p className="chart-tooltip__value">
+        {unit === "kcal" || unit === "mg" ? Math.round(value) : Math.round(value * 10) / 10}
+        {unit}
+      </p>
     </div>
   );
 };
 
-export function WeeklyChart({ allMeals, selectedDate, goals, onSelectDate }: Props) {
+function getMetricStatusColor(value: number, goal: number, reverse: boolean, isSelected: boolean) {
+  const ratio = goal > 0 ? value / goal : 0;
+  const good = reverse ? ratio >= 1 : ratio <= 0.75;
+  const warn = reverse ? ratio >= 0.8 : ratio <= 1;
+
+  if (good) return isSelected ? "#68b984" : "#496b57";
+  if (warn) return isSelected ? "#d4a64c" : "#7d6a3d";
+  return isSelected ? "#de7c74" : "#7c5854";
+}
+
+export function WeeklyChart({ allDays, selectedDate, goals, metric, onSelectDate }: Props) {
   const days = getLast7Days();
+  const metricConfig = NUTRITION_METRICS[metric];
+  const goal = goals[metric];
+  const byDate = new Map(allDays.map((day) => [day.date, day]));
 
   const data = days.map((date) => {
-    const meals    = allMeals.filter((m) => m.date === date);
-    const calories = meals.reduce((sum, m) => sum + m.calories, 0);
-    return { date, label: shortDay(date), calories };
+    const day = byDate.get(date);
+    const value = day ? Number((day as Record<string, unknown>)[metricConfig.apiTotalKey] ?? 0) : 0;
+    return { date, label: shortDay(date), value };
   });
 
   function handleBarClick(barData: unknown) {
@@ -60,33 +81,35 @@ export function WeeklyChart({ allMeals, selectedDate, goals, onSelectDate }: Pro
   return (
     <div className="card weekly-chart">
       <div className="card-header">
-        <h2>7-Day Overview</h2>
-        <span className="badge-pill">kcal</span>
+        <h2 style={{ fontWeight: 800 }}>7-Day Overview</h2>
+        <span className="badge-pill">{metricConfig.shortLabel}</span>
       </div>
-      <div style={{ padding: "var(--space-4) var(--space-5) var(--space-5)" }}>
+      <div style={{ padding: "0 var(--space-5) var(--space-6)" }}>
         <ResponsiveContainer width="100%" height={160}>
           <BarChart data={data} barCategoryGap="30%" margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-            <CartesianGrid vertical={false} stroke="var(--md-outline-variant)" strokeDasharray="3 3" />
+            <CartesianGrid vertical={false} stroke="rgba(71,72,70,0.4)" strokeDasharray="4 4" />
             <XAxis
               dataKey="label"
               axisLine={false}
               tickLine={false}
-              tick={{ fontSize: 11, fill: "var(--md-on-surface-variant)", fontWeight: 600, fontFamily: "Inter, sans-serif" }}
+              tick={{ fontSize: 11, fill: "#ababa8", fontWeight: 700, fontFamily: "Manrope, sans-serif", letterSpacing: "0.04em" }}
             />
             <YAxis hide />
             <Tooltip
-              content={<CustomTooltip />}
-              cursor={{ fill: "var(--md-surface-container-low)", rx: 6 }}
+              content={<CustomTooltip metric={metric} />}
+              cursor={{ fill: "rgba(42,45,42,0.6)", rx: 8 }}
             />
+            {/* Goal reference line */}
             <ReferenceLine
-              y={goals.calories}
-              stroke="var(--color-danger)"
-              strokeDasharray="4 4"
+              y={goal}
+              stroke="#de7c74"
+              strokeDasharray="5 4"
               strokeWidth={1.5}
+              strokeOpacity={0.7}
             />
             <Bar
-              dataKey="calories"
-              radius={[6, 6, 0, 0]}
+              dataKey="value"
+              radius={[8, 8, 4, 4]}
               maxBarSize={44}
               style={{ cursor: "pointer" }}
               onClick={handleBarClick}
@@ -94,23 +117,16 @@ export function WeeklyChart({ allMeals, selectedDate, goals, onSelectDate }: Pro
               {data.map((entry) => (
                 <Cell
                   key={entry.date}
-                  fill={
-                    entry.date === selectedDate
-                      ? "var(--md-primary)"
-                      : entry.calories > goals.calories
-                      ? "var(--color-danger)"
-                      : "var(--md-primary-container)"
-                  }
-                  stroke={entry.date === selectedDate ? "var(--color-accent-hover)" : "none"}
-                  strokeWidth={entry.date === selectedDate ? 1.5 : 0}
+                  fill={getMetricStatusColor(entry.value, goal, metricConfig.reverse, entry.date === selectedDate)}
+                  opacity={entry.date === selectedDate ? 1 : entry.value === 0 ? 0.25 : 0.85}
                 />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-        <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "var(--md-on-surface-variant)", marginTop: 8 }}>
-          <span style={{ display: "inline-block", width: 20, height: 3, borderRadius: 9999, background: "var(--color-danger)", opacity: 0.8 }} />
-          Goal: {goals.calories} kcal · tap a bar to navigate
+        <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.6875rem", color: "var(--md-on-surface-variant)", marginTop: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span style={{ display: "inline-block", width: 24, height: 3, borderRadius: 9999, background: "#de7c74", opacity: 0.7 }} />
+          Goal: {goal}{metricConfig.unit} · tap bar to navigate
         </p>
       </div>
     </div>

@@ -10,7 +10,11 @@ export function useGoals() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_GOALS_KEY);
-      if (raw) setGoals(JSON.parse(raw) as DailyGoals);
+      if (raw) {
+        // Merge with defaults so new fields are populated for existing users
+        const saved = JSON.parse(raw) as Partial<DailyGoals>;
+        setGoals({ ...DEFAULT_GOALS, ...saved });
+      }
     } catch {
       // ignore
     }

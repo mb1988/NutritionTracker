@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
-import { type CreateMealInput, createMeal } from "@/server/services/mealService";
+import { createMeal } from "@/server/services/mealService";
 import { ensureUserExists } from "@/server/services/dayService";
 
 type SavedMealInput = {
   name: string;
+  category?: string | null;
   calories: number;
   protein: number;
   carbs: number;
@@ -14,6 +15,8 @@ type SavedMealInput = {
   addedSugar: number;
   naturalSugar: number;
   salt: number;
+  alcohol?: number;
+  omega3?: number;
 };
 
 export async function createSavedMeal(userId: string, input: SavedMealInput) {
@@ -36,6 +39,25 @@ export async function listSavedMeals(userId: string) {
   });
 }
 
+export async function deleteSavedMeal(userId: string, savedMealId: string) {
+  await ensureUserExists(userId);
+
+  const existing = await prisma.savedMeal.findFirst({
+    where: {
+      id: savedMealId,
+      userId,
+    },
+  });
+
+  if (!existing) {
+    throw new AppError("Saved meal not found", 404);
+  }
+
+  await prisma.savedMeal.delete({
+    where: { id: savedMealId },
+  });
+}
+
 export async function useSavedMeal(userId: string, savedMealId: string, date: string) {
   await ensureUserExists(userId);
 
@@ -53,6 +75,7 @@ export async function useSavedMeal(userId: string, savedMealId: string, date: st
   return createMeal(userId, {
     date,
     name: savedMeal.name,
+    category: savedMeal.category as string | null | undefined,
     calories: savedMeal.calories,
     protein: savedMeal.protein,
     carbs: savedMeal.carbs,
@@ -62,5 +85,7 @@ export async function useSavedMeal(userId: string, savedMealId: string, date: st
     addedSugar: savedMeal.addedSugar,
     naturalSugar: savedMeal.naturalSugar,
     salt: savedMeal.salt,
+    alcohol: savedMeal.alcohol,
+    omega3: savedMeal.omega3,
   });
 }
