@@ -6,4 +6,4 @@ coverage
 prisma/dev.db
 nutrition-playbook
 
-\ntsconfig.tsbuildinfo
+tsconfig.tsbuildinfo
