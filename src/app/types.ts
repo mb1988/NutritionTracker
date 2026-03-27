@@ -55,8 +55,116 @@ export type DailyGoals = {
   protein: number;
   carbs: number;
   fat: number;
+  satFat: number;
   fibre: number;
+  addedSugar: number;
+  naturalSugar: number;
   salt: number;
+  alcohol: number;
+  omega3: number;
+};
+
+export type SelectableMetricKey = keyof DailyGoals;
+
+export const NUTRITION_METRICS: Record<
+  SelectableMetricKey,
+  {
+    label: string;
+    shortLabel: string;
+    unit: string;
+    reverse: boolean;
+    daySnapshotKey: keyof DaySnapshot;
+    apiTotalKey: string;
+  }
+> = {
+  calories: {
+    label: "Calories",
+    shortLabel: "Calories",
+    unit: "kcal",
+    reverse: false,
+    daySnapshotKey: "calories",
+    apiTotalKey: "totalCalories",
+  },
+  protein: {
+    label: "Protein",
+    shortLabel: "Protein",
+    unit: "g",
+    reverse: true,
+    daySnapshotKey: "protein",
+    apiTotalKey: "totalProtein",
+  },
+  carbs: {
+    label: "Carbs",
+    shortLabel: "Carbs",
+    unit: "g",
+    reverse: false,
+    daySnapshotKey: "carbs",
+    apiTotalKey: "totalCarbs",
+  },
+  fat: {
+    label: "Total Fat",
+    shortLabel: "Fat",
+    unit: "g",
+    reverse: false,
+    daySnapshotKey: "fat",
+    apiTotalKey: "totalFat",
+  },
+  satFat: {
+    label: "Sat Fat",
+    shortLabel: "Sat Fat",
+    unit: "g",
+    reverse: false,
+    daySnapshotKey: "satFat",
+    apiTotalKey: "totalSatFat",
+  },
+  fibre: {
+    label: "Fibre",
+    shortLabel: "Fibre",
+    unit: "g",
+    reverse: true,
+    daySnapshotKey: "fibre",
+    apiTotalKey: "totalFibre",
+  },
+  addedSugar: {
+    label: "Added Sugar",
+    shortLabel: "Sugar+",
+    unit: "g",
+    reverse: false,
+    daySnapshotKey: "addedSugar",
+    apiTotalKey: "totalAddedSugar",
+  },
+  naturalSugar: {
+    label: "Natural Sugar",
+    shortLabel: "Sugar",
+    unit: "g",
+    reverse: false,
+    daySnapshotKey: "naturalSugar",
+    apiTotalKey: "totalNaturalSugar",
+  },
+  salt: {
+    label: "Salt",
+    shortLabel: "Salt",
+    unit: "g",
+    reverse: false,
+    daySnapshotKey: "salt",
+    apiTotalKey: "totalSalt",
+  },
+  alcohol: {
+    label: "Alcohol",
+    shortLabel: "Alcohol",
+    unit: "u",
+    reverse: false,
+    daySnapshotKey: "alcohol",
+    apiTotalKey: "totalAlcohol",
+  },
+  omega3: {
+    label: "Omega-3",
+    shortLabel: "Omega-3",
+    unit: "mg",
+    reverse: true,
+    daySnapshotKey: "omega3",
+    apiTotalKey: "totalOmega3",
+  },
 };
 
 export const DEFAULT_GOALS: DailyGoals = {
@@ -64,8 +172,13 @@ export const DEFAULT_GOALS: DailyGoals = {
   protein: 150,
   carbs: 200,
   fat: 65,
+  satFat: 20,
   fibre: 30,
+  addedSugar: 25,
+  naturalSugar: 35,
   salt: 6,
+  alcohol: 2,
+  omega3: 250,
 };
 
 export const EMPTY_FORM_VALUES: MealFormValues = {

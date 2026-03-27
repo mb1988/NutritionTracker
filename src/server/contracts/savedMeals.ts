@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { nutritionInputSchema } from "@/server/contracts/common";
+import { MEAL_CATEGORIES } from "@/server/contracts/meals";
 
 export const createSavedMealSchema = z.object({
-  name: z.string().trim().min(1).max(120),
+  name:     z.string().trim().min(1).max(120),
+  category: z.enum(MEAL_CATEGORIES).nullable().optional(),
   ...nutritionInputSchema.shape,
 });
 

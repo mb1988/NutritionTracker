@@ -77,6 +77,8 @@ const MEAL_MACRO_SELECT = {
   addedSugar:   true,
   naturalSugar: true,
   salt:         true,
+  alcohol:      true,
+  omega3:       true,
 } as const;
 
 /**
@@ -107,6 +109,8 @@ async function recalculateDayTotalsTx(tx: Tx, dayId: string): Promise<Day> {
       totalAddedSugar:   t.addedSugar,
       totalNaturalSugar: t.naturalSugar,
       totalSalt:         t.salt,
+      totalAlcohol:      t.alcohol,
+      totalOmega3:       t.omega3,
     },
   });
 }
@@ -160,6 +164,8 @@ export async function createMeal(
           addedSugar:   input.addedSugar,
           naturalSugar: input.naturalSugar,
           salt:         input.salt,
+          alcohol:      input.alcohol,
+          omega3:       input.omega3,
         },
       });
 
@@ -200,6 +206,8 @@ export async function updateMeal(
           ...(input.addedSugar   !== undefined && { addedSugar:   input.addedSugar }),
           ...(input.naturalSugar !== undefined && { naturalSugar: input.naturalSugar }),
           ...(input.salt         !== undefined && { salt:         input.salt }),
+          ...(input.alcohol      !== undefined && { alcohol:      input.alcohol }),
+          ...(input.omega3       !== undefined && { omega3:       input.omega3 }),
         },
       });
 

@@ -8,6 +8,8 @@ export type MacroValues = {
   addedSugar:   number;
   naturalSugar: number;
   salt:         number;
+  alcohol:      number;
+  omega3:       number;
 };
 
 /** Zero-value accumulator — used as the reduce seed. */
@@ -21,6 +23,8 @@ export const ZERO_MACROS: Readonly<MacroValues> = Object.freeze({
   addedSugar:   0,
   naturalSugar: 0,
   salt:         0,
+  alcohol:      0,
+  omega3:       0,
 });
 
 /**
@@ -42,6 +46,8 @@ export function calculateDayTotals<T extends MacroValues>(meals: T[]): MacroValu
       addedSugar:   totals.addedSugar   + meal.addedSugar,
       naturalSugar: totals.naturalSugar + meal.naturalSugar,
       salt:         totals.salt         + meal.salt,
+      alcohol:      totals.alcohol      + meal.alcohol,
+      omega3:       totals.omega3       + meal.omega3,
     }),
     { ...ZERO_MACROS },
   );

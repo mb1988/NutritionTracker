@@ -27,16 +27,7 @@ export function MealItem({ meal, onEdit, onDelete }: Props) {
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
           <span className="meal-item__name">{meal.name}</span>
           {meal.category && (
-            <span style={{
-              fontSize: "0.6875rem",
-              fontWeight: 700,
-              background: "var(--md-surface-container)",
-              border: "1px solid var(--md-outline-variant)",
-              borderRadius: "var(--radius-full)",
-              padding: "2px 8px",
-              color: "var(--md-on-surface-variant)",
-              whiteSpace: "nowrap",
-            }}>
+            <span className="category-badge">
               {CATEGORY_ICONS[meal.category] ?? ""} {meal.category}
             </span>
           )}
@@ -54,17 +45,9 @@ export function MealItem({ meal, onEdit, onDelete }: Props) {
           >
             {Math.round(meal.calories)} kcal
           </span>
-          <MacroBadge
-            label="P"
-            value={meal.protein}
-            color="var(--macro-protein)"
-          />
-          <MacroBadge
-            label="C"
-            value={meal.carbs}
-            color="var(--macro-carbs)"
-          />
-          <MacroBadge label="F" value={meal.fat} color="var(--macro-fat)" />
+          <MacroBadge label="P" value={meal.protein} />
+          <MacroBadge label="C" value={meal.carbs} />
+          <MacroBadge label="F" value={meal.fat} />
         </div>
 
         {/* Secondary macros row */}
@@ -73,12 +56,7 @@ export function MealItem({ meal, onEdit, onDelete }: Props) {
             <MacroBadge label="Sat fat" value={meal.satFat} dim />
           )}
           {meal.fibre > 0 && (
-            <MacroBadge
-              label="Fibre"
-              value={meal.fibre}
-              color="var(--macro-fiber)"
-              dim
-            />
+            <MacroBadge label="Fibre" value={meal.fibre} dim />
           )}
           {meal.addedSugar > 0 && (
             <MacroBadge label="Added sugar" value={meal.addedSugar} dim />

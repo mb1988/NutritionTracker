@@ -10,6 +10,8 @@ export const nutritionInputSchema = z.object({
   addedSugar:    z.number().min(0),
   naturalSugar:  z.number().min(0),
   salt:          z.number().min(0),
+  alcohol:       z.number().min(0).default(0),
+  omega3:        z.number().min(0).default(0),
 });
 
 // Date strings arrive as YYYY-MM-DD; validate shape without coercing to Date.

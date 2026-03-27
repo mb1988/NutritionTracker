@@ -12,9 +12,9 @@ type Props = {
 export function MealList({ meals, onEdit, onDelete }: Props) {
   if (meals.length === 0) {
     return (
-      <div className="card" style={{ padding: "var(--space-12) var(--space-6)", textAlign: "center" }}>
-        <div style={{ fontSize: "2.75rem", marginBottom: "var(--space-3)", filter: "grayscale(0.2)" }}>🥗</div>
-        <p style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "var(--space-2)", letterSpacing: "-0.015em" }}>
+      <div className="card" style={{ padding: "var(--space-12) var(--space-6)", textAlign: "center", background: "var(--md-surface-container)" }}>
+        <div style={{ fontSize: "2.75rem", marginBottom: "var(--space-4)", filter: "grayscale(0.2)" }}>🥗</div>
+        <p style={{ fontWeight: 800, fontSize: "0.9375rem", marginBottom: "var(--space-2)", letterSpacing: "-0.02em" }}>
           No meals logged yet
         </p>
         <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)" }}>
@@ -28,10 +28,10 @@ export function MealList({ meals, onEdit, onDelete }: Props) {
 
   return (
     <div className="card" style={{ overflow: "hidden" }}>
-      <div className="card-header">
-        <h2>Meals logged</h2>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: "0.8125rem", color: "var(--macro-calories)", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+      <div className="card-header" style={{ borderBottom: "none", background: "rgba(255,255,255,0.04)" }}>
+        <h2 style={{ fontWeight: 800 }}>Meals logged</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: "0.875rem", color: "var(--macro-calories)", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
             {Math.round(totalCalories)} kcal
           </span>
           <span className="badge-pill">{meals.length}</span>
