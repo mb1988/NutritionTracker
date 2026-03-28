@@ -108,7 +108,7 @@ export function MetricSelector({ allDays, goals, selectedMetric, onSelect }: Pro
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              7d avg · {formatMetricValue(target, metric.unit)} tgt
+              {formatMetricValue(target, metric.unit)} tgt
             </span>
           </button>
         );

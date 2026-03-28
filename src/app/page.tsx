@@ -392,7 +392,7 @@ export default function HomePage() {
 
           <div className="stack" style={{ gap: "var(--space-3)" }}>
             <div className="section-label" style={{ marginBottom: 0 }}>
-              7-Day Metrics
+              7-Day Metrics Average
             </div>
             <MetricSelector
               allDays={allDays}
