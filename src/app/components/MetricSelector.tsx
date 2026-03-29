@@ -2,23 +2,15 @@
 
 import { NUTRITION_METRICS, type DailyGoals, type SelectableMetricKey } from "@/app/types";
 import { type ApiDay } from "@/app/hooks/useNutritionData";
+import { type TimePeriod, getDateRangeForPeriod, aggregateData } from "@/app/components/TimePeriodSelector";
 
 type Props = {
   allDays: ApiDay[];
   goals: DailyGoals;
   selectedMetric: SelectableMetricKey;
+  timePeriod: TimePeriod;
   onSelect: (metric: SelectableMetricKey) => void;
 };
-
-function getLast7Days(): string[] {
-  const days: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-  return days;
-}
 
 function getStatusColor(value: number, target: number, reverse: boolean) {
   const ratio = target > 0 ? value / target : 0;
@@ -37,9 +29,22 @@ function formatMetricValue(value: number, unit: string) {
   return `${Math.round(value * 10) / 10}${unit}`;
 }
 
-export function MetricSelector({ allDays, goals, selectedMetric, onSelect }: Props) {
-  const last7 = getLast7Days();
-  const byDate = new Map(allDays.map((day) => [day.date, day]));
+export function MetricSelector({ allDays, goals, selectedMetric, timePeriod, onSelect }: Props) {
+  const days = getDateRangeForPeriod(timePeriod);
+  const byDate = new Map(allDays.map((day) => [day.date, {
+    totalCalories: day.totalCalories,
+    totalProtein: day.totalProtein,
+    totalCarbs: day.totalCarbs,
+    totalFat: day.totalFat,
+    totalSatFat: day.totalSatFat,
+    totalFibre: day.totalFibre,
+    totalAddedSugar: day.totalAddedSugar,
+    totalNaturalSugar: day.totalNaturalSugar,
+    totalSalt: day.totalSalt,
+    totalSteps: day.totalSteps,
+    totalAlcohol: day.totalAlcohol,
+    totalOmega3: day.totalOmega3,
+  }]));
 
   return (
     <div
@@ -51,11 +56,13 @@ export function MetricSelector({ allDays, goals, selectedMetric, onSelect }: Pro
     >
       {(Object.keys(NUTRITION_METRICS) as SelectableMetricKey[]).map((metricKey) => {
         const metric = NUTRITION_METRICS[metricKey];
-        const values = last7.map((date) => {
-          const day = byDate.get(date);
-          return day ? Number((day as Record<string, unknown>)[metric.apiTotalKey] ?? 0) : 0;
-        });
-        const avg = values.reduce((sum, value) => sum + value, 0) / last7.length;
+        const aggregated = aggregateData(days, byDate, metric.apiTotalKey, timePeriod);
+        
+        // Calculate average across all aggregated periods
+        const total = aggregated.reduce((sum, item) => sum + item.value, 0);
+        const avg = aggregated.length > 0 ? total / aggregated.length : 0;
+        const daysWithData = aggregated.filter((item) => item.value > 0).length;
+        
         const target = goals[metricKey];
         const color = getStatusColor(avg, target, metric.reverse);
         const isSelected = selectedMetric === metricKey;
@@ -108,7 +115,7 @@ export function MetricSelector({ allDays, goals, selectedMetric, onSelect }: Pro
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {formatMetricValue(target, metric.unit)} tgt
+              {daysWithData < aggregated.length ? `only ${daysWithData}/${aggregated.length} periods` : `${formatMetricValue(target, metric.unit)} tgt`}
             </span>
           </button>
         );
