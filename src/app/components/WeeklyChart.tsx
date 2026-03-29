@@ -6,24 +6,16 @@ import {
 } from "recharts";
 import { NUTRITION_METRICS, type DailyGoals, type SelectableMetricKey } from "@/app/types";
 import { type ApiDay } from "@/app/hooks/useNutritionData";
+import { type TimePeriod, getDateRangeForPeriod } from "@/app/components/TimePeriodSelector";
 
 type Props = {
   allDays: ApiDay[];
   selectedDate: string;
   goals: DailyGoals;
   metric: SelectableMetricKey;
+  timePeriod: TimePeriod;
   onSelectDate: (date: string) => void;
 };
-
-function getLast7Days(): string[] {
-  const days: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-  return days;
-}
 
 function shortDay(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -60,8 +52,8 @@ function getMetricStatusColor(value: number, goal: number, reverse: boolean, isS
   return isSelected ? "#de7c74" : "#7c5854";
 }
 
-export function WeeklyChart({ allDays, selectedDate, goals, metric, onSelectDate }: Props) {
-  const days = getLast7Days();
+export function WeeklyChart({ allDays, selectedDate, goals, metric, timePeriod, onSelectDate }: Props) {
+  const days = getDateRangeForPeriod(timePeriod);
   const metricConfig = NUTRITION_METRICS[metric];
   const goal = goals[metric];
   const byDate = new Map(allDays.map((day) => [day.date, day]));
@@ -78,10 +70,19 @@ export function WeeklyChart({ allDays, selectedDate, goals, metric, onSelectDate
     }
   }
 
+  const getPeriodLabel = (period: TimePeriod): string => {
+    switch (period) {
+      case "1week": return "1 Week";
+      case "1month": return "1 Month";
+      case "3months": return "3 Months";
+      case "6months": return "6 Months";
+    }
+  };
+
   return (
     <div className="card weekly-chart">
       <div className="card-header">
-        <h2 style={{ fontWeight: 800 }}>7-Day Overview</h2>
+        <h2 style={{ fontWeight: 800 }}>{getPeriodLabel(timePeriod)} Overview</h2>
         <span className="badge-pill">{metricConfig.shortLabel}</span>
       </div>
       <div style={{ padding: "0 var(--space-5) var(--space-6)" }}>
