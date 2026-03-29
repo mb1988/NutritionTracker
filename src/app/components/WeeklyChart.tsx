@@ -68,6 +68,15 @@ export function WeeklyChart({ allDays, selectedDate, goals, metric, timePeriod, 
     }
   }
 
+  const getPeriodLabel = (period: TimePeriod): string => {
+    switch (period) {
+      case "1week": return "1 Week";
+      case "1month": return "1 Month";
+      case "3months": return "3 Months";
+      case "6months": return "6 Months";
+    }
+  };
+
   return (
     <div className="card weekly-chart">
       <div className="card-header">
