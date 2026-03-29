@@ -62,6 +62,8 @@ export function MetricSelector({ allDays, goals, selectedMetric, onSelect }: Pro
         const target = goals[metricKey];
         const color = getStatusColor(avg, target, metric.reverse);
         const isSelected = selectedMetric === metricKey;
+        const aggregated = values;
+        const daysWithData = values.filter(v => v > 0).length;
 
         return (
           <button
