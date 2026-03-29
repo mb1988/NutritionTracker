@@ -2,6 +2,7 @@
 
 import { NUTRITION_METRICS, type DailyGoals, type SelectableMetricKey } from "@/app/types";
 import { type ApiDay } from "@/app/hooks/useNutritionData";
+import { type TimePeriod } from "@/app/components/TimePeriodSelector";
 
 type Props = {
   allDays: ApiDay[];
