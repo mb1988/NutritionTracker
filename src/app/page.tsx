@@ -12,6 +12,7 @@ import { MealForm }      from "@/app/components/MealForm";
 import { MealList }      from "@/app/components/MealList";
 import { MetricSelector } from "@/app/components/MetricSelector";
 import { WeeklyChart }   from "@/app/components/WeeklyChart";
+import { TimePeriodSelector, type TimePeriod } from "@/app/components/TimePeriodSelector";
 
 // ── Targets ───────────────────────────────────────────────────
 const TARGETS = {
@@ -232,6 +233,7 @@ export default function HomePage() {
   const [historyDay,   setHistoryDay]   = useState<ApiDay | null>(null);
   const [editingMeal,  setEditingMeal]  = useState<ApiMeal | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<SelectableMetricKey>("calories");
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("1week");
   const [editScrollRequest, setEditScrollRequest] = useState(0);
   const mealFormRef = useRef<HTMLDivElement | null>(null);
 
@@ -392,12 +394,14 @@ export default function HomePage() {
 
           <div className="stack" style={{ gap: "var(--space-3)" }}>
             <div className="section-label" style={{ marginBottom: 0 }}>
-              7-Day Averages
+              Trend Analysis
             </div>
+            <TimePeriodSelector selected={timePeriod} onSelect={setTimePeriod} />
             <MetricSelector
               allDays={allDays}
               goals={goals}
               selectedMetric={selectedMetric}
+              timePeriod={timePeriod}
               onSelect={setSelectedMetric}
             />
           </div>
@@ -407,6 +411,7 @@ export default function HomePage() {
             selectedDate={selectedDate}
             goals={goals}
             metric={selectedMetric}
+            timePeriod={timePeriod}
             onSelectDate={(d) => { setSelectedDate(d); setEditingMeal(null); }}
           />
 

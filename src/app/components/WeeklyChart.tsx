@@ -6,24 +6,16 @@ import {
 } from "recharts";
 import { NUTRITION_METRICS, type DailyGoals, type SelectableMetricKey } from "@/app/types";
 import { type ApiDay } from "@/app/hooks/useNutritionData";
+import { type TimePeriod, getDateRangeForPeriod, getPeriodLabel, aggregateData } from "@/app/components/TimePeriodSelector";
 
 type Props = {
   allDays: ApiDay[];
   selectedDate: string;
   goals: DailyGoals;
   metric: SelectableMetricKey;
+  timePeriod: TimePeriod;
   onSelectDate: (date: string) => void;
 };
-
-function getLast7Days(): string[] {
-  const days: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-  return days;
-}
 
 function shortDay(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -60,17 +52,15 @@ function getMetricStatusColor(value: number, goal: number, reverse: boolean, isS
   return isSelected ? "#de7c74" : "#7c5854";
 }
 
-export function WeeklyChart({ allDays, selectedDate, goals, metric, onSelectDate }: Props) {
-  const days = getLast7Days();
+export function WeeklyChart({ allDays, selectedDate, goals, metric, timePeriod, onSelectDate }: Props) {
+  const days = getDateRangeForPeriod(timePeriod);
   const metricConfig = NUTRITION_METRICS[metric];
   const goal = goals[metric];
-  const byDate = new Map(allDays.map((day) => [day.date, day]));
+  const byDate = new Map(allDays.map((day) => [day.date, {
+    [metricConfig.apiTotalKey]: day[metricConfig.apiTotalKey as keyof ApiDay],
+  }]));
 
-  const data = days.map((date) => {
-    const day = byDate.get(date);
-    const value = day ? Number((day as Record<string, unknown>)[metricConfig.apiTotalKey] ?? 0) : 0;
-    return { date, label: shortDay(date), value };
-  });
+  const aggregatedData = aggregateData(days, byDate, metricConfig.apiTotalKey, timePeriod);
 
   function handleBarClick(barData: unknown) {
     if (barData && typeof barData === "object" && "date" in barData) {
@@ -81,12 +71,12 @@ export function WeeklyChart({ allDays, selectedDate, goals, metric, onSelectDate
   return (
     <div className="card weekly-chart">
       <div className="card-header">
-        <h2 style={{ fontWeight: 800 }}>7-Day Overview</h2>
+        <h2 style={{ fontWeight: 800 }}>{getPeriodLabel(timePeriod)} Overview</h2>
         <span className="badge-pill">{metricConfig.shortLabel}</span>
       </div>
       <div style={{ padding: "0 var(--space-5) var(--space-6)" }}>
         <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={data} barCategoryGap="30%" margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <BarChart data={aggregatedData} barCategoryGap="30%" margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="rgba(71,72,70,0.4)" strokeDasharray="4 4" />
             <XAxis
               dataKey="label"
@@ -114,7 +104,7 @@ export function WeeklyChart({ allDays, selectedDate, goals, metric, onSelectDate
               style={{ cursor: "pointer" }}
               onClick={handleBarClick}
             >
-              {data.map((entry) => (
+              {aggregatedData.map((entry) => (
                 <Cell
                   key={entry.date}
                   fill={getMetricStatusColor(entry.value, goal, metricConfig.reverse, entry.date === selectedDate)}
