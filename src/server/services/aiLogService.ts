@@ -37,20 +37,34 @@ Rules:
 export async function estimateNutrition(description: string): Promise<AiLogResponse> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new AppError("OPENAI_API_KEY is not configured", 503);
+    throw new AppError("OPENAI_API_KEY is not configured — add it in your .env file", 503);
   }
 
   const openai = new OpenAI({ apiKey });
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user",   content: description },
-    ],
-  });
+  let completion: OpenAI.Chat.Completions.ChatCompletion;
+  try {
+    completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user",   content: description },
+      ],
+    });
+  } catch (err) {
+    // Surface the real OpenAI error (billing, auth, rate-limit, etc.)
+    if (err instanceof OpenAI.APIError) {
+      const msg = err.status === 401
+        ? "Invalid OpenAI API key — check your OPENAI_API_KEY"
+        : err.status === 429
+        ? "OpenAI rate limit or billing issue — add a payment method at platform.openai.com/settings/organization/billing"
+        : `OpenAI error: ${err.message}`;
+      throw new AppError(msg, err.status ?? 502);
+    }
+    throw err;
+  }
 
   const raw = completion.choices[0]?.message?.content;
   if (!raw) {
