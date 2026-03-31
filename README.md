@@ -94,6 +94,7 @@ GITHUB_CLIENT_SECRET=
 ALLOWED_GITHUB_USERNAME=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
+OPENAI_API_KEY=
 ```
 
 | Variable | Purpose |
@@ -104,6 +105,7 @@ NEXTAUTH_URL=
 | `ALLOWED_GITHUB_USERNAME` | Restricts authenticated access to a single GitHub account |
 | `NEXTAUTH_SECRET` | Secret used to sign NextAuth session tokens |
 | `NEXTAUTH_URL` | Full public URL of the app (e.g. `https://yourapp.up.railway.app`) |
+| `OPENAI_API_KEY` | OpenAI API key for AI-powered meal logging (`gpt-4o-mini`) |
 
 ---
 
@@ -161,6 +163,7 @@ All routes require an active session or a valid demo cookie. Data is scoped to t
 | `DELETE` | `/api/saved-meals/:id` | Delete a saved meal template |
 | `POST` | `/api/saved-meals/use` | Add a saved meal to a specific day |
 | `POST` | `/api/demo/reset` | Reset demo user data to sample defaults |
+| `POST` | `/api/ai-log` | AI-powered nutrition estimate from natural language (returns JSON, no DB write) |
 
 ---
 
