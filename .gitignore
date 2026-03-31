@@ -7,3 +7,7 @@ prisma/dev.db
 nutrition-playbook
 
 tsconfig.tsbuildinfo
+
+# macOS
+.DS_Store
+
