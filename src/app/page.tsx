@@ -169,6 +169,22 @@ function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddM
   const [editingMeal, setEditingMeal] = useState<ApiMeal | null>(null);
   const [draftSteps, setDraftSteps] = useState("");
   const [stepsSaved, setStepsSaved] = useState(false);
+  const formRef = useRef<HTMLDivElement | null>(null);
+
+  // Clear edit state + steps draft when navigating to a different day
+  useEffect(() => {
+    setEditingMeal(null);
+    setDraftSteps("");
+  }, [date]);
+
+  // Scroll to form when editing starts
+  useEffect(() => {
+    if (!editingMeal) return;
+    const raf = requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [editingMeal]);
 
   const today = localISODate();
   const isToday = date === today;
@@ -281,31 +297,33 @@ function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddM
       />
 
       {/* Add / edit meal form — with saved meal templates */}
-      {editingMeal ? (
-        <MealForm
-          key={editingMeal.id}
-          initialValues={{
-            name: editingMeal.name, category: editingMeal.category,
-            calories: editingMeal.calories,
-            protein: editingMeal.protein, carbs: editingMeal.carbs,
-            fat: editingMeal.fat, satFat: editingMeal.satFat,
-            fibre: editingMeal.fibre, addedSugar: editingMeal.addedSugar,
-            naturalSugar: editingMeal.naturalSugar, salt: editingMeal.salt,
-            alcohol: editingMeal.alcohol ?? 0,
-            omega3: editingMeal.omega3 ?? 0,
-          }}
-          onSubmit={async (values) => { await onUpdateMeal(editingMeal.id, values, date); setEditingMeal(null); }}
-          onCancel={() => setEditingMeal(null)}
-          onSaveTemplate={onSaveTemplate}
-        />
-      ) : (
-        <MealForm
-          onSubmit={(values) => onAddMeal(date, values)}
-          savedMeals={savedMeals}
-          onSaveTemplate={onSaveTemplate}
-          onDeleteSaved={onDeleteSaved}
-        />
-      )}
+      <div ref={formRef} style={{ scrollMarginTop: "var(--space-6)" }}>
+        {editingMeal ? (
+          <MealForm
+            key={editingMeal.id}
+            initialValues={{
+              name: editingMeal.name, category: editingMeal.category,
+              calories: editingMeal.calories,
+              protein: editingMeal.protein, carbs: editingMeal.carbs,
+              fat: editingMeal.fat, satFat: editingMeal.satFat,
+              fibre: editingMeal.fibre, addedSugar: editingMeal.addedSugar,
+              naturalSugar: editingMeal.naturalSugar, salt: editingMeal.salt,
+              alcohol: editingMeal.alcohol ?? 0,
+              omega3: editingMeal.omega3 ?? 0,
+            }}
+            onSubmit={async (values) => { await onUpdateMeal(editingMeal.id, values, date); setEditingMeal(null); }}
+            onCancel={() => setEditingMeal(null)}
+            onSaveTemplate={onSaveTemplate}
+          />
+        ) : (
+          <MealForm
+            onSubmit={(values) => onAddMeal(date, values)}
+            savedMeals={savedMeals}
+            onSaveTemplate={onSaveTemplate}
+            onDeleteSaved={onDeleteSaved}
+          />
+        )}
+      </div>
     </div>
   );
 }
