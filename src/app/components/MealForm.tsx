@@ -48,11 +48,13 @@ export function MealForm({
   const [values, setValues] = useState<MealFormValues>(initialValues ?? EMPTY_FORM_VALUES);
   const [error,  setError]  = useState<string | null>(null);
   const [saved,  setSaved]  = useState(false);
+  const [collapsed, setCollapsed] = useState(!isEditing);
 
   useEffect(() => {
     setValues(initialValues ?? EMPTY_FORM_VALUES);
     setError(null);
     setSaved(false);
+    if (initialValues) setCollapsed(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialValues]);
 
@@ -108,22 +110,46 @@ export function MealForm({
       }}
     >
       {/* Header */}
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-6)" }}>
-        <div>
-          <h2 style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "-0.025em" }}>
-            {isEditing ? "✏️ Edit meal" : "➕ Log meal"}
-          </h2>
-          {isEditing && (
-            <p style={{ fontSize: "0.75rem", color: "var(--md-primary-container)", marginTop: 3, fontWeight: 600 }}>
-              Update the details below, then save when you're ready.
-            </p>
+      <div
+        className="row"
+        style={{
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: collapsed ? 0 : "var(--space-6)",
+          cursor: isEditing ? undefined : "pointer",
+          userSelect: isEditing ? undefined : "none",
+        }}
+        onClick={isEditing ? undefined : () => setCollapsed((c) => !c)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          {!isEditing && (
+            <span style={{
+              fontSize: "0.75rem",
+              transition: "transform 0.2s ease",
+              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+              display: "inline-block",
+            }}>
+              ▼
+            </span>
           )}
+          <div>
+            <h2 style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "-0.025em" }}>
+              {isEditing ? "✏️ Edit meal" : "➕ Log meal"}
+            </h2>
+            {isEditing && (
+              <p style={{ fontSize: "0.75rem", color: "var(--md-primary-container)", marginTop: 3, fontWeight: 600 }}>
+                Update the details below, then save when you&apos;re ready.
+              </p>
+            )}
+          </div>
         </div>
         {isEditing && onCancel && (
           <button type="button" className="btn-ghost btn-sm" onClick={onCancel}>✕ Cancel</button>
         )}
       </div>
 
+      {!collapsed && (
+        <>
       {/* Saved meal picker */}
       {!isEditing && savedMeals && savedMeals.length > 0 && onDeleteSaved && (
         <div style={{ marginBottom: "var(--space-6)" }}>
@@ -224,6 +250,8 @@ export function MealForm({
           )}
         </div>
       </form>
+        </>
+      )}
     </div>
   );
 }
