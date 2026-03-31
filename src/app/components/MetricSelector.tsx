@@ -2,7 +2,7 @@
 
 import { NUTRITION_METRICS, type DailyGoals, type SelectableMetricKey } from "@/app/types";
 import { type ApiDay } from "@/app/hooks/useNutritionData";
-import { type TimePeriod } from "@/app/components/TimePeriodSelector";
+import { type TimePeriod, getDateRangeForPeriod } from "@/app/components/TimePeriodSelector";
 
 type Props = {
   allDays: ApiDay[];
@@ -29,96 +29,113 @@ function formatMetricValue(value: number, unit: string) {
   return `${Math.round(value * 10) / 10}${unit}`;
 }
 
-function getLast7Days(): string[] {
-  const days: string[] = [];
-  const today = new Date();
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - i);
-    days.push(date.toISOString().slice(0, 10));
-  }
-  return days;
-}
-
-export function MetricSelector({ allDays, goals, selectedMetric, onSelect }: Props) {
-  const last7 = getLast7Days();
+export function MetricSelector({ allDays, goals, selectedMetric, timePeriod, onSelect }: Props) {
+  const periodDays = getDateRangeForPeriod(timePeriod);
   const byDate = new Map(allDays.map((day) => [day.date, day]));
 
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))",
-        gap: "var(--space-2)",
-      }}
-    >
-      {(Object.keys(NUTRITION_METRICS) as SelectableMetricKey[]).map((metricKey) => {
-        const metric = NUTRITION_METRICS[metricKey];
-        const values = last7.map((date) => {
-          const day = byDate.get(date);
-          return day ? Number((day as Record<string, unknown>)[metric.apiTotalKey] ?? 0) : 0;
-        });
-        const avg = values.reduce((sum, value) => sum + value, 0) / last7.length;
-        const target = goals[metricKey];
-        const color = getStatusColor(avg, target, metric.reverse);
-        const isSelected = selectedMetric === metricKey;
-        const aggregated = values;
-        const daysWithData = values.filter(v => v > 0).length;
+  // Days in the period that actually exist in the DB
+  const totalDays = periodDays.length;
+  const daysWithData = periodDays.filter((date) => byDate.has(date)).length;
+  const showCoverageNotice = daysWithData < totalDays;
 
-        return (
-          <button
-            key={metricKey}
-            type="button"
-            onClick={() => onSelect(metricKey)}
-            style={{
-              padding: "10px 12px",
-              borderRadius: "var(--radius-md)",
-              border: isSelected ? "1px solid rgba(104, 185, 132, 0.35)" : "1px solid rgba(255,255,255,0.06)",
-              background: isSelected ? "rgba(104, 185, 132, 0.08)" : "var(--md-surface-container-high)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: 4,
-              textAlign: "left",
-              minHeight: 72,
-            }}
-            title={`Show 7-day trend for ${metric.label}`}
-          >
-            <span
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+      {/* Coverage notice — shown below selector, above metric tiles */}
+      {showCoverageNotice && (
+        <p style={{
+          margin: 0,
+          fontSize: "0.75rem",
+          fontWeight: 600,
+          color: "var(--md-on-surface-variant)",
+        }}>
+          {daysWithData === 0
+            ? "No data logged for this period yet"
+            : `${daysWithData} of ${totalDays} days have data · averages are over logged days only`}
+        </p>
+      )}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))",
+          gap: "var(--space-2)",
+        }}
+      >
+        {(Object.keys(NUTRITION_METRICS) as SelectableMetricKey[]).map((metricKey) => {
+          const metric = NUTRITION_METRICS[metricKey];
+
+          // Average only over days that are actually logged
+          const loggedValues = periodDays
+            .filter((date) => byDate.has(date))
+            .map((date) => Number((byDate.get(date) as Record<string, unknown>)[metric.apiTotalKey] ?? 0));
+
+          const avg =
+            loggedValues.length > 0
+              ? loggedValues.reduce((sum, v) => sum + v, 0) / loggedValues.length
+              : 0;
+
+          const target = goals[metricKey];
+          const color = getStatusColor(avg, target, metric.reverse);
+          const isSelected = selectedMetric === metricKey;
+
+          return (
+            <button
+              key={metricKey}
+              type="button"
+              onClick={() => onSelect(metricKey)}
               style={{
-                fontSize: "0.625rem",
-                fontWeight: 800,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                color: isSelected ? "var(--md-primary)" : "var(--md-on-surface-variant)",
+                padding: "10px 12px",
+                borderRadius: "var(--radius-md)",
+                border: isSelected
+                  ? "1px solid rgba(104, 185, 132, 0.35)"
+                  : "1px solid rgba(255,255,255,0.06)",
+                background: isSelected
+                  ? "rgba(104, 185, 132, 0.08)"
+                  : "var(--md-surface-container-high)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: 4,
+                textAlign: "left",
+                minHeight: 72,
               }}
+              title={`Show trend for ${metric.label}`}
             >
-              {metric.shortLabel}
-            </span>
-            <span
-              style={{
-                fontSize: "0.95rem",
-                fontWeight: 800,
-                color,
-                lineHeight: 1.1,
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {formatMetricValue(avg, metric.unit)}
-            </span>
-            <span
-              style={{
-                fontSize: "0.6875rem",
-                color: "var(--md-on-surface-variant)",
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {daysWithData < aggregated.length ? `only ${daysWithData}/${aggregated.length} periods` : `${formatMetricValue(target, metric.unit)} tgt`}
-            </span>
-          </button>
-        );
-      })}
+              <span
+                style={{
+                  fontSize: "0.625rem",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  color: isSelected ? "var(--md-primary)" : "var(--md-on-surface-variant)",
+                }}
+              >
+                {metric.shortLabel}
+              </span>
+              <span
+                style={{
+                  fontSize: "0.95rem",
+                  fontWeight: 800,
+                  color: loggedValues.length > 0 ? color : "var(--md-on-surface-variant)",
+                  lineHeight: 1.1,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {loggedValues.length > 0 ? formatMetricValue(avg, metric.unit) : "—"}
+              </span>
+              <span
+                style={{
+                  fontSize: "0.6875rem",
+                  color: "var(--md-on-surface-variant)",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {formatMetricValue(target, metric.unit)} tgt
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
-
