@@ -2,13 +2,28 @@
 
 import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { DEMO_COOKIE } from "@/lib/demo";
 
 export default function LoginPage() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   async function handleGitHubSignIn() {
     setLoading(true);
     await signIn("github", { callbackUrl: "/" });
+  }
+
+  async function handleDemo() {
+    setDemoLoading(true);
+    // Set the demo cookie (30-day expiry)
+    document.cookie = `${DEMO_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+    try {
+      // Seed / reset the demo user data so there's always something to see
+      await fetch("/api/demo/reset", { method: "POST" });
+    } catch {
+      // Non-fatal — demo data may already exist
+    }
+    window.location.href = "/";
   }
 
   return (
@@ -59,17 +74,16 @@ export default function LoginPage() {
         <p style={{
           fontSize: "0.9375rem",
           color: "var(--md-on-surface-variant)",
-          marginBottom: "var(--space-10)",
+          marginBottom: "var(--space-8)",
           lineHeight: 1.7,
         }}>
           Track your daily nutrition, macros and goals.
-          <br />Sign in to access your data.
         </p>
 
         {/* GitHub sign-in button */}
         <button
           onClick={handleGitHubSignIn}
-          disabled={loading}
+          disabled={loading || demoLoading}
           className="btn-tonal"
           style={{
             width: "100%",
@@ -85,17 +99,52 @@ export default function LoginPage() {
           {loading ? "Signing in…" : "Sign in with GitHub"}
         </button>
 
-        {/* Green primary CTA below */}
-        <div style={{ marginTop: "var(--space-3)" }}>
-          <p style={{
-            fontSize: "0.75rem",
-            color: "var(--md-on-surface-variant)",
-            marginTop: "var(--space-6)",
-            opacity: 0.6,
-          }}>
-            Your data is private to your account only.
-          </p>
+        {/* Divider */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          margin: "var(--space-5) 0",
+        }}>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+          <span style={{ fontSize: "0.75rem", color: "var(--md-on-surface-variant)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>or</span>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
         </div>
+
+        {/* Try Demo button */}
+        <button
+          onClick={handleDemo}
+          disabled={loading || demoLoading}
+          style={{
+            width: "100%",
+            padding: "var(--space-4) var(--space-6)",
+            fontSize: "0.9375rem",
+            fontWeight: 700,
+            borderRadius: "var(--radius-full)",
+            border: "1px solid rgba(104, 185, 132, 0.35)",
+            background: "rgba(104, 185, 132, 0.08)",
+            color: "var(--md-primary)",
+            cursor: "pointer",
+            transition: "all var(--transition)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "var(--space-3)",
+          }}
+        >
+          <span style={{ fontSize: "1.1rem" }}>🚀</span>
+          {demoLoading ? "Setting up demo…" : "Try Demo — no sign-in needed"}
+        </button>
+
+        {/* Footer note */}
+        <p style={{
+          fontSize: "0.75rem",
+          color: "var(--md-on-surface-variant)",
+          marginTop: "var(--space-6)",
+          opacity: 0.6,
+        }}>
+          Demo loads 12 days of sample data you can explore and edit.
+        </p>
       </div>
     </div>
   );

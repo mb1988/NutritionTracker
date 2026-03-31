@@ -13,6 +13,7 @@ import { MealList }      from "@/app/components/MealList";
 import { MetricSelector } from "@/app/components/MetricSelector";
 import { WeeklyChart }   from "@/app/components/WeeklyChart";
 import { TimePeriodSelector, type TimePeriod } from "@/app/components/TimePeriodSelector";
+import { DEMO_COOKIE } from "@/lib/demo";
 
 // ── Targets ───────────────────────────────────────────────────
 const TARGETS = {
@@ -269,7 +270,8 @@ function PageSkeleton() {
 type Tab = "today" | "history";
 
 export default function HomePage() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
+  const isDemo = sessionStatus !== "loading" && !session;
   const [tab,            setTab]            = useState<Tab>("today");
   const [selectedDate,   setSelectedDate]   = useState(todayISO());
   const [historyDate,    setHistoryDate]    = useState<string | null>(null);
@@ -277,13 +279,35 @@ export default function HomePage() {
   const [selectedMetric, setSelectedMetric] = useState<SelectableMetricKey>("calories");
   const [timePeriod,     setTimePeriod]     = useState<TimePeriod>("1week");
   const [editScrollRequest, setEditScrollRequest] = useState(0);
+  const [resettingDemo,  setResettingDemo]  = useState(false);
   const mealFormRef = useRef<HTMLDivElement | null>(null);
 
-  const { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, updateSteps } =
+  const { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, updateSteps, refreshAll } =
     useNutritionData(selectedDate);
 
   const { goals, updateGoals }                    = useGoals();
   const { savedMeals, saveMeal, deleteSavedMeal } = useSavedMeals();
+
+  // ── Demo helpers ──────────────────────────────────────────
+  const exitDemo = useCallback(() => {
+    document.cookie = `${DEMO_COOKIE}=; path=/; max-age=0`;
+    window.location.href = "/login";
+  }, []);
+
+  const resetDemo = useCallback(async () => {
+    setResettingDemo(true);
+    try {
+      await fetch("/api/demo/reset", { method: "POST" });
+      setSelectedDate(todayISO());
+      setHistoryDate(null);
+      setEditingMeal(null);
+      await refreshAll();
+    } catch {
+      // non-fatal
+    } finally {
+      setResettingDemo(false);
+    }
+  }, [refreshAll]);
 
   const totals = selectedDay
     ? {
@@ -359,8 +383,8 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* User info + sign out */}
-        {session?.user && (
+        {/* User info / demo badge */}
+        {session?.user ? (
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
             {session.user.image && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -379,8 +403,54 @@ export default function HomePage() {
               Sign out
             </button>
           </div>
-        )}
+        ) : isDemo ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <span style={{
+              fontSize: "0.6875rem",
+              fontWeight: 700,
+              padding: "4px 10px",
+              borderRadius: "var(--radius-full)",
+              background: "rgba(104, 185, 132, 0.12)",
+              color: "var(--md-primary)",
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+            }}>
+              Demo
+            </span>
+            <button onClick={exitDemo} className="btn-ghost btn-sm" style={{ fontSize: "0.75rem" }}>
+              Sign in →
+            </button>
+          </div>
+        ) : null}
       </header>
+
+      {/* Demo banner */}
+      {isDemo && (
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--space-3)",
+          padding: "var(--space-3) var(--space-4)",
+          borderRadius: "var(--radius-md)",
+          background: "rgba(104, 185, 132, 0.06)",
+          border: "1px solid rgba(104, 185, 132, 0.15)",
+          fontSize: "0.8125rem",
+          flexWrap: "wrap",
+        }}>
+          <span style={{ color: "var(--md-on-surface-variant)" }}>
+            🔍 <strong style={{ color: "var(--md-primary)" }}>Demo mode</strong> — explore freely, all features work!
+          </span>
+          <button
+            onClick={resetDemo}
+            disabled={resettingDemo}
+            className="btn-ghost btn-sm"
+            style={{ fontSize: "0.75rem", whiteSpace: "nowrap" }}
+          >
+            {resettingDemo ? "Resetting…" : "↺ Reset data"}
+          </button>
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="tab-bar">
