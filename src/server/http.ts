@@ -1,19 +1,30 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import { ZodError } from "zod";
 import { AppError } from "@/server/errors";
 import { authOptions } from "@/lib/auth";
+import { DEMO_COOKIE, DEMO_USER_ID } from "@/lib/demo";
 
 /**
- * Returns the authenticated DB user ID from the session.
- * Throws 401 if not authenticated.
+ * Returns the authenticated DB user ID from the session,
+ * or the demo user ID when the demo cookie is present.
+ * Throws 401 if neither is available.
  */
 export async function getAuthenticatedUserId(): Promise<string> {
+  // Real session takes priority
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    throw new AppError("Not authenticated", 401);
+  if (session?.user?.id) {
+    return session.user.id;
   }
-  return session.user.id;
+
+  // Fall back to demo mode
+  const cookieStore = await cookies();
+  if (cookieStore.get(DEMO_COOKIE)?.value === "1") {
+    return DEMO_USER_ID;
+  }
+
+  throw new AppError("Not authenticated", 401);
 }
 
 export function handleApiError(error: unknown): NextResponse {
