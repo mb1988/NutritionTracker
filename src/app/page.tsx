@@ -144,43 +144,58 @@ function DayCard({ day, onClick }: { day: ApiDay; onClick: () => void }) {
   );
 }
 
-function DayDetail({ day, onBack, onEdit, onDelete }: {
-  day: ApiDay;
+function DayDetail({ day, date, onBack, onAddMeal, onUpdateMeal, onDeleteMeal, savedMeals, onSaveTemplate, onDeleteSaved }: {
+  day: ApiDay | null;
+  date: string;
   onBack: () => void;
-  onEdit: (meal: ApiMeal) => void;
-  onDelete: (mealId: string) => void;
+  onAddMeal: (date: string, values: MealFormValues) => Promise<void>;
+  onUpdateMeal: (mealId: string, values: MealFormValues, date: string) => Promise<void>;
+  onDeleteMeal: (mealId: string, date: string) => Promise<void>;
+  savedMeals: ReturnType<typeof useSavedMeals>["savedMeals"];
+  onSaveTemplate: (values: MealFormValues) => Promise<void>;
+  onDeleteSaved: (id: string) => Promise<void>;
 }) {
-  const score = getDayScore(day);
+  const [editingMeal, setEditingMeal] = useState<ApiMeal | null>(null);
+  const score = day ? getDayScore(day) : 0;
   const { emoji, label, cls } = scoreInfo(score);
+
   return (
     <div className="stack" style={{ gap: "var(--space-5)" }}>
       <button onClick={onBack} className="btn-ghost btn-sm" style={{ width: "fit-content", paddingLeft: 0 }}>
         ← Back to history
       </button>
 
+      {/* Day header + macro bars */}
       <div className="card" style={{ background: "var(--md-surface-container)" }}>
         <div style={{ padding: "var(--space-6)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-6)" }}>
             <div>
-              <h2 style={{ fontSize: "1.25rem", letterSpacing: "-0.03em", fontWeight: 800 }}>{formatDate(day.date)}</h2>
+              <h2 style={{ fontSize: "1.25rem", letterSpacing: "-0.03em", fontWeight: 800 }}>{formatDate(date)}</h2>
               <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 4 }}>
-                {day.meals.length} meal{day.meals.length !== 1 ? "s" : ""}
-                {day.totalSteps > 0 && ` · ${day.totalSteps.toLocaleString()} steps`}
+                {day ? `${day.meals.length} meal${day.meals.length !== 1 ? "s" : ""}` : "No meals logged yet"}
+                {day && day.totalSteps > 0 && ` · ${day.totalSteps.toLocaleString()} steps`}
               </div>
             </div>
-            <span className={`score-chip ${cls}`} style={{ fontSize: 13 }}>{emoji} {label}</span>
+            {day && <span className={`score-chip ${cls}`} style={{ fontSize: 13 }}>{emoji} {label}</span>}
           </div>
 
-          <div className="stack" style={{ gap: "var(--space-2)" }}>
-            {(Object.entries(TARGETS) as [TargetKey, typeof TARGETS[TargetKey]][]).map(([key, cfg]) => {
-              const val = day[`total${key.charAt(0).toUpperCase() + key.slice(1)}` as keyof ApiDay] as number ?? 0;
-              return <MacroBar key={key} label={cfg.label} value={val} target={cfg.target} unit={cfg.unit} reverse={cfg.reverse} />;
-            })}
-          </div>
+          {day ? (
+            <div className="stack" style={{ gap: "var(--space-2)" }}>
+              {(Object.entries(TARGETS) as [TargetKey, typeof TARGETS[TargetKey]][]).map(([key, cfg]) => {
+                const val = day[`total${key.charAt(0).toUpperCase() + key.slice(1)}` as keyof ApiDay] as number ?? 0;
+                return <MacroBar key={key} label={cfg.label} value={val} target={cfg.target} unit={cfg.unit} reverse={cfg.reverse} />;
+              })}
+            </div>
+          ) : (
+            <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)" }}>
+              No nutrition data logged for this day — add a meal below to get started.
+            </p>
+          )}
         </div>
       </div>
 
-      {day.meals.length > 0 && (
+      {/* Meals list with inline edit / delete */}
+      {day && day.meals.length > 0 && (
         <div className="card" style={{ overflow: "hidden" }}>
           <div className="card-header">
             <h2>Meals</h2>
@@ -195,12 +210,39 @@ function DayDetail({ day, onBack, onEdit, onDelete }: {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 4 }}>
-                <button className="btn-ghost btn-sm" onClick={() => onEdit(m)}>✏️</button>
-                <button className="btn-danger-ghost btn-sm" onClick={() => onDelete(m.id)}>🗑</button>
+                <button className="btn-ghost btn-sm" onClick={() => setEditingMeal(m)}>✏️</button>
+                <button className="btn-danger-ghost btn-sm" onClick={() => onDeleteMeal(m.id, date)}>🗑</button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {/* Add / edit meal form — with saved meal templates */}
+      {editingMeal ? (
+        <MealForm
+          key={editingMeal.id}
+          initialValues={{
+            name: editingMeal.name, category: editingMeal.category,
+            calories: editingMeal.calories,
+            protein: editingMeal.protein, carbs: editingMeal.carbs,
+            fat: editingMeal.fat, satFat: editingMeal.satFat,
+            fibre: editingMeal.fibre, addedSugar: editingMeal.addedSugar,
+            naturalSugar: editingMeal.naturalSugar, salt: editingMeal.salt,
+            alcohol: editingMeal.alcohol ?? 0,
+            omega3: editingMeal.omega3 ?? 0,
+          }}
+          onSubmit={async (values) => { await onUpdateMeal(editingMeal.id, values, date); setEditingMeal(null); }}
+          onCancel={() => setEditingMeal(null)}
+          onSaveTemplate={onSaveTemplate}
+        />
+      ) : (
+        <MealForm
+          onSubmit={(values) => onAddMeal(date, values)}
+          savedMeals={savedMeals}
+          onSaveTemplate={onSaveTemplate}
+          onDeleteSaved={onDeleteSaved}
+        />
       )}
     </div>
   );
@@ -228,12 +270,12 @@ type Tab = "today" | "history";
 
 export default function HomePage() {
   const { data: session } = useSession();
-  const [tab,          setTab]          = useState<Tab>("today");
-  const [selectedDate, setSelectedDate] = useState(todayISO());
-  const [historyDay,   setHistoryDay]   = useState<ApiDay | null>(null);
-  const [editingMeal,  setEditingMeal]  = useState<ApiMeal | null>(null);
+  const [tab,            setTab]            = useState<Tab>("today");
+  const [selectedDate,   setSelectedDate]   = useState(todayISO());
+  const [historyDate,    setHistoryDate]    = useState<string | null>(null);
+  const [editingMeal,    setEditingMeal]    = useState<ApiMeal | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<SelectableMetricKey>("calories");
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>("1week");
+  const [timePeriod,     setTimePeriod]     = useState<TimePeriod>("1week");
   const [editScrollRequest, setEditScrollRequest] = useState(0);
   const mealFormRef = useRef<HTMLDivElement | null>(null);
 
@@ -283,27 +325,6 @@ export default function HomePage() {
     [deleteMeal, selectedDate],
   );
 
-  const handleHistoryDelete = useCallback(
-    async (id: string) => {
-      if (!historyDay) return;
-      await deleteMeal(id, historyDay.date);
-      setHistoryDay((prev) => prev ? { ...prev, meals: prev.meals.filter((m) => m.id !== id) } : null);
-    },
-    [deleteMeal, historyDay],
-  );
-
-  const handleHistoryEdit = useCallback(
-    (meal: ApiMeal) => {
-      if (!historyDay) return;
-
-      setSelectedDate(historyDay.date);
-      setTab("today");
-      setHistoryDay(null);
-      setEditingMeal(meal);
-      setEditScrollRequest((prev) => prev + 1);
-    },
-    [historyDay],
-  );
 
   useEffect(() => {
     if (!editingMeal || tab !== "today" || editScrollRequest === 0 || loading) return;
@@ -366,7 +387,12 @@ export default function HomePage() {
         {(["today", "history"] as Tab[]).map((t) => (
           <button
             key={t}
-            onClick={() => { setTab(t); setHistoryDay(null); setEditingMeal(null); }}
+            onClick={() => {
+              setTab(t);
+              setHistoryDate(null);
+              setEditingMeal(null);
+              if (t === "today") setSelectedDate(todayISO());
+            }}
             className={tab === t ? "active" : ""}
           >
             {t === "today" ? "Today" : `History${allDays.length > 0 ? ` (${allDays.length})` : ""}`}
@@ -380,7 +406,17 @@ export default function HomePage() {
           <DatePicker
             date={selectedDate}
             steps={selectedDay?.totalSteps ?? 0}
-            onChange={(d) => { setSelectedDate(d); setEditingMeal(null); }}
+            onChange={(d) => {
+              if (d === todayISO()) {
+                setSelectedDate(d);
+                setEditingMeal(null);
+              } else {
+                // Navigate to history detail for any past date
+                setHistoryDate(d);
+                setTab("history");
+                setEditingMeal(null);
+              }
+            }}
             onStepsSave={(steps) => updateSteps(selectedDate, steps)}
           />
 
@@ -412,7 +448,16 @@ export default function HomePage() {
             goals={goals}
             metric={selectedMetric}
             timePeriod={timePeriod}
-            onSelectDate={(d) => { setSelectedDate(d); setEditingMeal(null); }}
+            onSelectDate={(d) => {
+              if (d === todayISO()) {
+                setSelectedDate(d);
+                setEditingMeal(null);
+              } else {
+                setHistoryDate(d);
+                setTab("history");
+                setEditingMeal(null);
+              }
+            }}
           />
 
           <div ref={mealFormRef} style={{ scrollMarginTop: "var(--space-6)" }}>
@@ -456,12 +501,17 @@ export default function HomePage() {
 
       {/* HISTORY tab */}
       {tab === "history" && (
-        historyDay ? (
+        historyDate ? (
           <DayDetail
-            day={historyDay}
-            onBack={() => setHistoryDay(null)}
-            onEdit={handleHistoryEdit}
-            onDelete={handleHistoryDelete}
+            day={allDays.find((d) => d.date === historyDate) ?? null}
+            date={historyDate}
+            onBack={() => setHistoryDate(null)}
+            onAddMeal={addMeal}
+            onUpdateMeal={updateMeal}
+            onDeleteMeal={deleteMeal}
+            savedMeals={savedMeals}
+            onSaveTemplate={saveMeal}
+            onDeleteSaved={deleteSavedMeal}
           />
         ) : (
           <div>
@@ -479,7 +529,7 @@ export default function HomePage() {
             ) : (
               <div className="stack" style={{ gap: "var(--space-3)" }}>
                 {allDays.map((d) => (
-                  <DayCard key={d.date} day={d} onClick={() => setHistoryDay(d)} />
+                  <DayCard key={d.date} day={d} onClick={() => setHistoryDate(d.date)} />
                 ))}
               </div>
             )}
