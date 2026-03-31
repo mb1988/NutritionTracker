@@ -19,11 +19,14 @@ function formatDisplayDate(iso: string): string {
   });
 }
 
-/** Adds/subtracts days from an ISO date string */
+/** Adds/subtracts days from an ISO date string (timezone-safe) */
 function offsetDate(iso: string, delta: number): string {
   const d = new Date(`${iso}T00:00:00`);
   d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function DatePicker({ date, steps, onChange, onStepsSave }: Props) {
@@ -45,7 +48,7 @@ export function DatePicker({ date, steps, onChange, onStepsSave }: Props) {
     setTimeout(() => setSaved(false), 1500);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
   const isToday = date === today;
 
   return (

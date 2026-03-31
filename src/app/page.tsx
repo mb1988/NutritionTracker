@@ -33,8 +33,15 @@ const TARGETS = {
 type TargetKey = keyof typeof TARGETS;
 
 // ── Helpers ───────────────────────────────────────────────────
+function localISODate(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localISODate();
 }
 
 function formatDate(iso: string) {
@@ -120,8 +127,9 @@ function DayCard({ day, onClick }: { day: ApiDay; onClick: () => void }) {
         <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.02em" }}>{formatDate(day.date)}</div>
         <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 4, lineHeight: 1.5 }}>
           {Math.round(day.totalCalories)} kcal &nbsp;·&nbsp;
-          sugar {Math.round(day.totalAddedSugar)}g &nbsp;·&nbsp;
-          fibre {Math.round(day.totalFibre)}g
+          P {Math.round(day.totalProtein)}g &nbsp;·&nbsp;
+          C {Math.round(day.totalCarbs)}g &nbsp;·&nbsp;
+          F {Math.round(day.totalFat)}g
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 10 }}>
           {(Object.keys(TARGETS) as TargetKey[]).slice(0, 5).map((k) => {
@@ -164,13 +172,13 @@ function DayDetail({ day, date, onBack, onDateChange, onAddMeal, onUpdateMeal, o
   const score = day ? getDayScore(day) : 0;
   const { emoji, label, cls } = scoreInfo(score);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate();
   const isToday = date === today;
 
   function offsetDate(iso: string, delta: number): string {
     const d = new Date(`${iso}T00:00:00`);
     d.setDate(d.getDate() + delta);
-    return d.toISOString().slice(0, 10);
+    return localISODate(d);
   }
 
   function handleStepsSubmit() {
@@ -287,29 +295,12 @@ function DayDetail({ day, date, onBack, onDateChange, onAddMeal, onUpdateMeal, o
         </div>
       </div>
 
-      {/* Meals list with inline edit / delete */}
-      {day && day.meals.length > 0 && (
-        <div className="card" style={{ overflow: "hidden" }}>
-          <div className="card-header">
-            <h2>Meals</h2>
-            <span className="badge-pill">{day.meals.length}</span>
-          </div>
-          {day.meals.map((m) => (
-            <div key={m.id} style={{ padding: "var(--space-4) var(--space-6)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: "-0.015em" }}>{m.name}</div>
-                <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 2 }}>
-                  {Math.round(m.calories)} kcal · sat fat {m.satFat}g · sugar {m.addedSugar}g
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 4 }}>
-                <button className="btn-ghost btn-sm" onClick={() => setEditingMeal(m)}>✏️</button>
-                <button className="btn-danger-ghost btn-sm" onClick={() => onDeleteMeal(m.id, date)}>🗑</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Meals list with consistent MealItem display */}
+      <MealList
+        meals={(day?.meals ?? []).map((m) => ({ ...m, date }))}
+        onEdit={(meal) => setEditingMeal(meal as ApiMeal)}
+        onDelete={(id) => onDeleteMeal(id, date)}
+      />
 
       {/* Add / edit meal form — with saved meal templates */}
       {editingMeal ? (
