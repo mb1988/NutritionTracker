@@ -1,56 +1,72 @@
 # Nutrition Tracker
 
-An authenticated nutrition tracking app built with Next.js App Router, TypeScript, Prisma, PostgreSQL, NextAuth, and Zod.
+A personal, single-user nutrition tracking web app built with Next.js 15 App Router, TypeScript, Prisma, PostgreSQL, NextAuth (GitHub), and Zod.
 
-The app lets a signed-in user log meals, track daily nutrition targets, store reusable meal templates, review recent trends, and browse historical days.
+Designed to make it fast and low-friction to log everything you eat, monitor macro and micronutrient targets, review recent trends, and build up a library of meals you eat regularly.
 
-## Current features
+---
 
-- GitHub sign-in with route protection via NextAuth middleware
-- Per-user nutrition history stored in PostgreSQL
-- Daily meal logging with create, edit, and delete flows
-- Daily totals for calories, protein, carbs, fat, sat fat, fibre, sugars, salt, alcohol, omega-3, and steps
-- Customisable daily goals stored locally in the browser
-- Saved meal templates, with one-time localStorage migration into the database
-- 7-day metric selector and chart for quick trend review
-- History view with per-day scoring and drill-down into logged meals
+## Features
+
+### Daily Logging
+- Log meals with calories, protein, carbs, fat, sat fat, fibre, added sugar, natural sugar, salt, alcohol, and omega-3
+- Edit and delete individual meals
+- Navigate between days with a date picker
+- Daily totals and per-macro progress bars update in real time
+
+### Saved Meals
+- Save any meal as a reusable template
+- Quickly add a saved meal to the current day from a picker
+- Manage (rename, delete) saved meals from a dedicated panel
+
+### Goals
+- Customisable daily targets for each tracked nutrient, stored per-user in the database
+- Visual progress indicators show how close you are to each goal
+
+### Trends & History
+- Configurable metric selector covering any tracked nutrient plus steps
+- Weekly bar chart with support for **daily**, **7-day rolling average**, and **monthly average** views
+- Time period switcher (Last 7 days / Last 30 days / Last 90 days)
+- History list of past days with a per-day score and drill-down into logged meals
+
+### Auth & Access Control
+- GitHub OAuth sign-in via NextAuth
+- All routes protected by middleware — only the configured GitHub username can access the app
+- Data is fully scoped to the authenticated user
+
+---
 
 ## Stack
 
-- Next.js 15 App Router
-- React 19
-- TypeScript
-- Prisma + PostgreSQL
-- NextAuth GitHub provider
-- Zod validation
-- Vitest for service tests
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 App Router |
+| Language | TypeScript |
+| UI | React 19, Recharts |
+| ORM | Prisma |
+| Database | PostgreSQL |
+| Auth | NextAuth v4 (GitHub provider) |
+| Validation | Zod |
+| Testing | Vitest |
+| Deployment | Railway |
 
-## Data model
+---
 
-Prisma currently models:
+## Data Model
 
-- `User`
-- `Day`
-- `Meal`
-- `SavedMeal`
+```
+User
+ └─ Day            (one per calendar date; stores recalculated snapshot totals)
+     └─ Meal       (individual food entries)
+ └─ SavedMeal      (reusable meal templates)
+ └─ UserProfile    (daily nutrition goals)
+```
 
-`Day` stores persisted snapshot totals, and those totals are recalculated whenever meals are created, updated, or deleted.
+`Day` totals are recalculated server-side whenever a meal is created, updated, or deleted.
 
-## Authentication
+---
 
-- Sign-in happens through GitHub
-- All app routes are protected except `/login`, `/api/auth/*`, and Next.js static assets
-- Data is scoped to the authenticated user
-
-The login page and auth config live in:
-
-- `src/app/login/page.tsx`
-- `src/lib/auth.ts`
-- `src/middleware.ts`
-
-## Environment variables
-
-At minimum, configure:
+## Environment Variables
 
 ```bash
 DATABASE_URL=
@@ -61,22 +77,22 @@ NEXTAUTH_SECRET=
 NEXTAUTH_URL=
 ```
 
-Notes:
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Postgres connection string |
+| `GITHUB_ID` | GitHub OAuth App client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth App client secret |
+| `ALLOWED_GITHUB_USERNAME` | Restricts access to a single GitHub account |
+| `NEXTAUTH_SECRET` | Secret used to sign NextAuth session tokens |
+| `NEXTAUTH_URL` | Full public URL of the app (e.g. `https://yourapp.up.railway.app`) |
 
-- `ALLOWED_GITHUB_USERNAME` is used to restrict access to a single GitHub account
-- `NEXTAUTH_SECRET` and `NEXTAUTH_URL` are standard NextAuth runtime settings
+---
 
-## Local development
-
-1. Install dependencies
-2. Create your local env file
-3. Generate the Prisma client
-4. Run migrations
-5. Start the app
+## Local Development
 
 ```bash
 npm install
-cp .env.example .env
+cp .env.example .env          # fill in your values
 npm run prisma:generate
 npm run prisma:migrate
 npm run dev
@@ -84,64 +100,66 @@ npm run dev
 
 Open `http://localhost:3000` and sign in with the allowed GitHub account.
 
-## Available scripts
-
-```bash
-npm run dev
-npm run build
-npm run start
-npm run typecheck
-npm run test
-npm run prisma:generate
-npm run prisma:migrate
-npm run prisma:studio
-```
-
-## Optional seed data
-
-The repo includes a Prisma seed script:
+### Optional seed data
 
 ```bash
 npx prisma db seed
 ```
 
-This is mainly useful for local development. The current seed creates a sample user, a sample day, sample meals, and one saved meal template.
+Creates a sample user, day, meals, and a saved meal template — useful for a quick local smoke-test.
 
-## API surface
+---
 
-Main app routes currently include:
+## Scripts
 
-- `GET /api/days`
-- `GET /api/days?date=YYYY-MM-DD`
-- `POST /api/days`
-- `PATCH /api/days`
-- `POST /api/meals`
-- `PATCH /api/meals/:id`
-- `DELETE /api/meals/:id`
-- `GET /api/saved-meals`
-- `POST /api/saved-meals`
-- `DELETE /api/saved-meals/:id`
-- `POST /api/saved-meals/use`
+```bash
+npm run dev              # start dev server
+npm run build            # production build
+npm run start            # start production server
+npm run typecheck        # TypeScript check (no emit)
+npm run test             # run Vitest unit tests
+npm run prisma:generate  # generate Prisma client
+npm run prisma:migrate   # run pending migrations (dev)
+npm run prisma:studio    # open Prisma Studio
+```
 
-These routes use the authenticated session; they do not rely on the old `x-user-id` header flow documented in earlier versions of the project.
+---
+
+## API Routes
+
+All routes require an active session. Data is scoped to the authenticated user.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/days` | List days (optional `?date=YYYY-MM-DD` for a single day) |
+| `POST` | `/api/days` | Upsert a day record |
+| `PATCH` | `/api/days` | Update day-level fields (e.g. steps) |
+| `POST` | `/api/meals` | Create a meal and recalculate day totals |
+| `PATCH` | `/api/meals/:id` | Update a meal and recalculate day totals |
+| `DELETE` | `/api/meals/:id` | Delete a meal and recalculate day totals |
+| `GET` | `/api/saved-meals` | List saved meal templates |
+| `POST` | `/api/saved-meals` | Create a saved meal template |
+| `DELETE` | `/api/saved-meals/:id` | Delete a saved meal template |
+| `POST` | `/api/saved-meals/use` | Add a saved meal to a specific day |
+
+---
 
 ## Deployment
 
-`railway.toml` is configured for Railway with:
+Configured for [Railway](https://railway.app) via `railway.toml`:
 
-- Prisma client generation during build
-- `prisma migrate deploy` during build
-- `next build` for the production bundle
-- `npm start -- -p $PORT` as the start command
+- Prisma client generation + `prisma migrate deploy` run during build
+- `next build` produces the production bundle
+- `npm start -- -p $PORT` starts the server
+
+Provision a PostgreSQL plugin in Railway, set the environment variables, and deploy.
+
+---
 
 ## Testing
 
 ```bash
-npm run typecheck
-npm run test
+npm run typecheck   # catch type errors
+npm run test        # unit tests (calculations.test.ts)
 ```
-
-## Notes on legacy utilities
-
-The repo still contains some one-off migration/bootstrap helpers under `prisma/` such as `migrate-user-data.ts` and `migrate-historical.js`. They are not part of the standard runtime or deployment flow and should be treated as manual maintenance scripts.
 
