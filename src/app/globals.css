@@ -511,17 +511,11 @@ hr {
   letter-spacing: -0.015em;
 }
 
-.meal-item__macros-primary {
+.meal-item__macros {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-}
-
-.meal-item__macros-secondary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: 6px;
 }
 
 .meal-item__actions {
@@ -532,20 +526,26 @@ hr {
 
 /* ─── Macro badge ─────────────────────────────────────────── */
 .macro-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.8125rem;
-  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  background: var(--md-surface-container-highest);
   border-radius: var(--radius-full);
-  padding: 2px var(--space-3);
-  color: var(--color-text-muted);
+  padding: 3px var(--space-3);
+  line-height: 1.2;
 }
 
-.macro-badge--dim {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-  background: transparent;
+.macro-badge__label {
+  opacity: 0.7;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.macro-badge__value {
+  font-weight: 800;
 }
 
 /* ─── Macro input ─────────────────────────────────────────── */

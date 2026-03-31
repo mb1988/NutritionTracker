@@ -97,7 +97,7 @@ const MACRO_ROWS: Array<{
 export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave }: Props) {
   const remaining = Math.max(0, goals.calories - totals.calories);
   const isOver    = totals.calories > goals.calories;
-  const todayIso  = new Date().toISOString().slice(0, 10);
+  const todayIso  = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
   const isToday   = selectedDate === todayIso;
   const title     = isToday ? "Today’s Progress" : `Progress for ${formatDisplayDate(selectedDate)}`;
 

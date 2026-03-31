@@ -51,7 +51,10 @@ export function getDateRangeForPeriod(period: TimePeriod): string[] {
 
   const current = new Date(startDate);
   while (current <= endDate) {
-    days.push(current.toISOString().slice(0, 10));
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, "0");
+    const d = String(current.getDate()).padStart(2, "0");
+    days.push(`${y}-${m}-${d}`);
     current.setDate(current.getDate() + 1);
   }
 

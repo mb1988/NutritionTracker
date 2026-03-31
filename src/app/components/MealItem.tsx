@@ -2,14 +2,13 @@
 
 import { type LocalMeal } from "@/app/types";
 import { MacroBadge } from "@/app/components/MacroBadge";
+import { getNutrientStatus } from "@/app/components/nutrientStatus";
 
 type Props = {
   meal: LocalMeal;
   onEdit: (meal: LocalMeal) => void;
   onDelete: (id: string) => void;
 };
-
-const KCAL_COLOR = "var(--macro-calories)";
 
 const CATEGORY_ICONS: Record<string, string> = {
   Breakfast: "🌅",
@@ -33,43 +32,32 @@ export function MealItem({ meal, onEdit, onDelete }: Props) {
           )}
         </div>
 
-        {/* Primary macros row */}
-        <div className="meal-item__macros-primary">
-          <span
-            style={{
-              fontSize: "0.9375rem",
-              fontWeight: 700,
-              color: KCAL_COLOR,
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {Math.round(meal.calories)} kcal
-          </span>
-          <MacroBadge label="P" value={meal.protein} />
-          <MacroBadge label="C" value={meal.carbs} />
-          <MacroBadge label="F" value={meal.fat} />
-        </div>
-
-        {/* Secondary macros row */}
-        <div className="meal-item__macros-secondary">
+        {/* All macros in a single consistent row */}
+        <div className="meal-item__macros">
+          <MacroBadge label="Kcal"       value={meal.calories}     unit=" kcal" status={getNutrientStatus("calories", meal.calories)} />
+          <MacroBadge label="Protein"    value={meal.protein}                   status={getNutrientStatus("protein", meal.protein)} />
+          <MacroBadge label="Carbs"      value={meal.carbs}                     status={getNutrientStatus("carbs", meal.carbs)} />
+          <MacroBadge label="Fat"        value={meal.fat}                       status={getNutrientStatus("fat", meal.fat)} />
           {meal.satFat > 0 && (
-            <MacroBadge label="Sat fat" value={meal.satFat} dim />
+            <MacroBadge label="Sat fat"    value={meal.satFat}                  status={getNutrientStatus("satFat", meal.satFat)} />
           )}
           {meal.fibre > 0 && (
-            <MacroBadge label="Fibre" value={meal.fibre} dim />
+            <MacroBadge label="Fibre"      value={meal.fibre}                   status={getNutrientStatus("fibre", meal.fibre)} />
           )}
           {meal.addedSugar > 0 && (
-            <MacroBadge label="Added sugar" value={meal.addedSugar} dim />
+            <MacroBadge label="Sugar"      value={meal.addedSugar}              status={getNutrientStatus("addedSugar", meal.addedSugar)} />
           )}
           {meal.naturalSugar > 0 && (
-            <MacroBadge label="Nat. sugar" value={meal.naturalSugar} dim />
+            <MacroBadge label="Nat. sugar" value={meal.naturalSugar}            status={getNutrientStatus("naturalSugar", meal.naturalSugar)} />
           )}
-          {meal.salt > 0 && <MacroBadge label="Salt" value={meal.salt} dim />}
+          {meal.salt > 0 && (
+            <MacroBadge label="Salt"       value={meal.salt}                    status={getNutrientStatus("salt", meal.salt)} />
+          )}
           {meal.alcohol > 0 && (
-            <MacroBadge label="Alcohol" value={meal.alcohol} unit="u" dim />
+            <MacroBadge label="Alcohol"    value={meal.alcohol}    unit=" u"    status={getNutrientStatus("alcohol", meal.alcohol)} />
           )}
           {meal.omega3 > 0 && (
-            <MacroBadge label="Omega-3" value={meal.omega3} unit="mg" dim />
+            <MacroBadge label="Omega-3"    value={meal.omega3}     unit=" mg"   status={getNutrientStatus("omega3", meal.omega3)} />
           )}
         </div>
       </div>
