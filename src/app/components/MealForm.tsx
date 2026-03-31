@@ -50,6 +50,10 @@ export function MealForm({
   const [saved,  setSaved]  = useState(false);
   const [collapsed, setCollapsed] = useState(!isEditing);
 
+  // AI estimation state
+  const [aiPrompt,  setAiPrompt]  = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+
   useEffect(() => {
     setValues(initialValues ?? EMPTY_FORM_VALUES);
     setError(null);
@@ -74,6 +78,45 @@ export function MealForm({
     const { id: _id, ...vals } = meal;
     setValues(vals);
     setError(null);
+  }
+
+  async function handleAiEstimate() {
+    const text = aiPrompt.trim();
+    if (!text) { setError("Describe what you ate so AI can estimate nutrition."); return; }
+    setAiLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/ai-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: text }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? `Request failed (${res.status})`);
+      }
+      const data = await res.json();
+      setValues({
+        name:         data.name         ?? "",
+        category:     data.category     ?? null,
+        calories:     data.calories     ?? 0,
+        protein:      data.protein      ?? 0,
+        carbs:        data.carbs        ?? 0,
+        fat:          data.fat          ?? 0,
+        satFat:       data.satFat       ?? 0,
+        fibre:        data.fibre        ?? 0,
+        addedSugar:   data.addedSugar   ?? 0,
+        naturalSugar: data.naturalSugar ?? 0,
+        salt:         data.salt         ?? 0,
+        alcohol:      data.alcohol      ?? 0,
+        omega3:       data.omega3       ?? 0,
+      });
+      setAiPrompt("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI estimation failed.");
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   function handleSubmit(e: FormEvent) {
@@ -150,6 +193,73 @@ export function MealForm({
 
       {!collapsed && (
         <>
+          {/* AI estimation */}
+          {!isEditing && (
+            <div style={{
+              marginBottom: "var(--space-5)",
+              padding: "var(--space-4) var(--space-5)",
+              borderRadius: "var(--radius-lg)",
+              background: "linear-gradient(135deg, rgba(104,185,132,0.06) 0%, rgba(104,185,132,0.02) 100%)",
+              border: "1px solid rgba(104,185,132,0.15)",
+            }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: "var(--space-2)",
+                marginBottom: "var(--space-3)",
+              }}>
+                <span style={{ fontSize: "1.1rem" }}>✨</span>
+                <span style={{
+                  fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase",
+                  letterSpacing: "0.06em", color: "var(--md-primary)",
+                }}>
+                  AI Estimate
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                <input
+                  type="text"
+                  placeholder="e.g. 200g chicken breast with rice and broccoli"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); handleAiEstimate(); }
+                  }}
+                  disabled={aiLoading}
+                  style={{
+                    flex: 1,
+                    fontSize: "0.9375rem",
+                    fontWeight: 500,
+                    background: "var(--md-surface-container)",
+                    border: "1px solid var(--md-outline-variant)",
+                    borderRadius: "var(--radius-full)",
+                    padding: "10px var(--space-4)",
+                    color: "var(--md-on-surface)",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAiEstimate}
+                  disabled={aiLoading || !aiPrompt.trim()}
+                  className="btn-primary btn-sm"
+                  style={{
+                    borderRadius: "var(--radius-full)",
+                    padding: "10px var(--space-5)",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                >
+                  {aiLoading ? "Estimating…" : "✨ Estimate"}
+                </button>
+              </div>
+              <p style={{
+                fontSize: "0.6875rem", color: "var(--md-on-surface-variant)",
+                marginTop: "var(--space-2)", lineHeight: 1.4,
+              }}>
+                Describe your meal with quantities — AI fills all nutrition fields for you.
+              </p>
+            </div>
+          )}
+
           {/* Saved meal picker */}
           {!isEditing && savedMeals && savedMeals.length > 0 && onDeleteSaved && (
             <div style={{ marginBottom: "var(--space-6)" }}>
