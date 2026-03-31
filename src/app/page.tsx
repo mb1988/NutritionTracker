@@ -145,20 +145,44 @@ function DayCard({ day, onClick }: { day: ApiDay; onClick: () => void }) {
   );
 }
 
-function DayDetail({ day, date, onBack, onAddMeal, onUpdateMeal, onDeleteMeal, savedMeals, onSaveTemplate, onDeleteSaved }: {
+function DayDetail({ day, date, onBack, onDateChange, onAddMeal, onUpdateMeal, onDeleteMeal, onStepsSave, savedMeals, onSaveTemplate, onDeleteSaved }: {
   day: ApiDay | null;
   date: string;
   onBack: () => void;
+  onDateChange: (date: string) => void;
   onAddMeal: (date: string, values: MealFormValues) => Promise<void>;
   onUpdateMeal: (mealId: string, values: MealFormValues, date: string) => Promise<void>;
   onDeleteMeal: (mealId: string, date: string) => Promise<void>;
+  onStepsSave: (date: string, steps: number) => Promise<void>;
   savedMeals: ReturnType<typeof useSavedMeals>["savedMeals"];
   onSaveTemplate: (values: MealFormValues) => Promise<void>;
   onDeleteSaved: (id: string) => Promise<void>;
 }) {
   const [editingMeal, setEditingMeal] = useState<ApiMeal | null>(null);
+  const [draftSteps, setDraftSteps] = useState("");
+  const [stepsSaved, setStepsSaved] = useState(false);
   const score = day ? getDayScore(day) : 0;
   const { emoji, label, cls } = scoreInfo(score);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const isToday = date === today;
+
+  function offsetDate(iso: string, delta: number): string {
+    const d = new Date(`${iso}T00:00:00`);
+    d.setDate(d.getDate() + delta);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function handleStepsSubmit() {
+    const n = parseInt(draftSteps, 10);
+    const val = isNaN(n) || n < 0 ? 0 : n;
+    onStepsSave(date, val);
+    setStepsSaved(true);
+    setTimeout(() => setStepsSaved(false), 1500);
+  }
+
+  const currentSteps = day?.totalSteps ?? 0;
+  const displaySteps = draftSteps !== "" ? draftSteps : currentSteps > 0 ? String(currentSteps) : "";
 
   return (
     <div className="stack" style={{ gap: "var(--space-5)" }}>
@@ -166,7 +190,75 @@ function DayDetail({ day, date, onBack, onAddMeal, onUpdateMeal, onDeleteMeal, s
         ← Back to history
       </button>
 
-      {/* Day header + macro bars */}
+      {/* Date navigation */}
+      <div className="card date-picker" style={{ flexWrap: "wrap", gap: "var(--space-3)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flex: 1, minWidth: 200 }}>
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            onClick={() => onDateChange(offsetDate(date, -1))}
+            title="Previous day"
+            style={{ padding: "var(--space-1) var(--space-2)", fontSize: "1rem", flexShrink: 0 }}
+          >
+            ‹
+          </button>
+          <div className="date-picker__info" style={{ flex: 1, textAlign: "center" }}>
+            <span className="date-picker__eyebrow">Viewing</span>
+            <span className="date-picker__value">
+              {new Date(`${date}T00:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            onClick={() => onDateChange(offsetDate(date, 1))}
+            title="Next day"
+            disabled={isToday}
+            style={{ padding: "var(--space-1) var(--space-2)", fontSize: "1rem", flexShrink: 0 }}
+          >
+            ›
+          </button>
+        </div>
+
+        {/* Steps */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+            👟 Steps
+          </span>
+          <input
+            type="number"
+            min={0}
+            max={100000}
+            step={500}
+            placeholder="0"
+            value={displaySteps}
+            onChange={(e) => setDraftSteps(e.target.value)}
+            onBlur={handleStepsSubmit}
+            onKeyDown={(e) => e.key === "Enter" && handleStepsSubmit()}
+            style={{ width: 90, textAlign: "right" }}
+            className="date-picker__input"
+            aria-label="Daily steps"
+          />
+          {stepsSaved && (
+            <span style={{ fontSize: "0.75rem", color: "var(--md-primary-container)", fontWeight: 700 }}>✓</span>
+          )}
+        </div>
+
+        {/* Calendar input */}
+        <input
+          type="date"
+          value={date}
+          max={today}
+          onChange={(e) => {
+            if (e.target.value) {
+              onDateChange(e.target.value);
+            }
+          }}
+          className="date-picker__input"
+        />
+      </div>
+
+      {/* Day summary card */}
       <div className="card" style={{ background: "var(--md-surface-container)" }}>
         <div style={{ padding: "var(--space-6)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-6)" }}>
@@ -349,6 +441,31 @@ export default function HomePage() {
     [deleteMeal, selectedDate],
   );
 
+  /** Navigate to a past day's detail view, scrolling to top */
+  const navigateToHistoryDate = useCallback((d: string) => {
+    if (d === todayISO()) {
+      setSelectedDate(todayISO());
+      setHistoryDate(null);
+      setTab("today");
+      setEditingMeal(null);
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    setHistoryDate(d);
+    setTab("history");
+    setEditingMeal(null);
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  /** Return to Today tab, scrolling to top */
+  const navigateToToday = useCallback(() => {
+    setSelectedDate(todayISO());
+    setHistoryDate(null);
+    setTab("today");
+    setEditingMeal(null);
+    window.scrollTo({ top: 0 });
+  }, []);
+
 
   useEffect(() => {
     if (!editingMeal || tab !== "today" || editScrollRequest === 0 || loading) return;
@@ -458,10 +575,14 @@ export default function HomePage() {
           <button
             key={t}
             onClick={() => {
-              setTab(t);
-              setHistoryDate(null);
-              setEditingMeal(null);
-              if (t === "today") setSelectedDate(todayISO());
+              if (t === "today") {
+                navigateToToday();
+              } else {
+                setTab("history");
+                setHistoryDate(null);
+                setEditingMeal(null);
+                window.scrollTo({ top: 0 });
+              }
             }}
             className={tab === t ? "active" : ""}
           >
@@ -481,10 +602,7 @@ export default function HomePage() {
                 setSelectedDate(d);
                 setEditingMeal(null);
               } else {
-                // Navigate to history detail for any past date
-                setHistoryDate(d);
-                setTab("history");
-                setEditingMeal(null);
+                navigateToHistoryDate(d);
               }
             }}
             onStepsSave={(steps) => updateSteps(selectedDate, steps)}
@@ -523,9 +641,7 @@ export default function HomePage() {
                 setSelectedDate(d);
                 setEditingMeal(null);
               } else {
-                setHistoryDate(d);
-                setTab("history");
-                setEditingMeal(null);
+                navigateToHistoryDate(d);
               }
             }}
           />
@@ -575,10 +691,12 @@ export default function HomePage() {
           <DayDetail
             day={allDays.find((d) => d.date === historyDate) ?? null}
             date={historyDate}
-            onBack={() => setHistoryDate(null)}
+            onBack={() => { setHistoryDate(null); window.scrollTo({ top: 0 }); }}
+            onDateChange={navigateToHistoryDate}
             onAddMeal={addMeal}
             onUpdateMeal={updateMeal}
             onDeleteMeal={deleteMeal}
+            onStepsSave={updateSteps}
             savedMeals={savedMeals}
             onSaveTemplate={saveMeal}
             onDeleteSaved={deleteSavedMeal}
@@ -599,7 +717,7 @@ export default function HomePage() {
             ) : (
               <div className="stack" style={{ gap: "var(--space-3)" }}>
                 {allDays.map((d) => (
-                  <DayCard key={d.date} day={d} onClick={() => setHistoryDate(d.date)} />
+                  <DayCard key={d.date} day={d} onClick={() => navigateToHistoryDate(d.date)} />
                 ))}
               </div>
             )}
