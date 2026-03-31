@@ -15,15 +15,15 @@ import { WeeklyChart }   from "@/app/components/WeeklyChart";
 import { TimePeriodSelector, type TimePeriod } from "@/app/components/TimePeriodSelector";
 import { DEMO_COOKIE } from "@/lib/demo";
 
-// ── Targets ───────────────────────────────────────────────────
+// ── Targets (order matches DayTotals rows) ────────────────────
 const TARGETS = {
   calories:     { label: "Calories",      unit: "kcal", target: 2200, reverse: false },
+  protein:      { label: "Protein",       unit: "g",    target: 100,  reverse: true  },
+  carbs:        { label: "Carbs",         unit: "g",    target: 250,  reverse: false },
+  fat:          { label: "Total Fat",     unit: "g",    target: 70,   reverse: false },
+  satFat:       { label: "Sat Fat",       unit: "g",    target: 20,   reverse: false },
   addedSugar:   { label: "Added Sugar",   unit: "g",    target: 25,   reverse: false },
   naturalSugar: { label: "Natural Sugar", unit: "g",    target: 35,   reverse: false },
-  satFat:       { label: "Sat Fat",       unit: "g",    target: 20,   reverse: false },
-  fat:          { label: "Total Fat",     unit: "g",    target: 70,   reverse: false },
-  carbs:        { label: "Carbs",         unit: "g",    target: 250,  reverse: false },
-  protein:      { label: "Protein",       unit: "g",    target: 100,  reverse: true  },
   fibre:        { label: "Fibre",         unit: "g",    target: 28,   reverse: true  },
   salt:         { label: "Salt",          unit: "g",    target: 6,    reverse: false },
   alcohol:      { label: "Alcohol",       unit: "u",    target: 2,    reverse: false },
@@ -74,28 +74,26 @@ function scoreInfo(score: number): { emoji: string; label: string; cls: string }
 
 // ── Sub-components ────────────────────────────────────────────
 
-function MacroBar({ label, value, target, unit, reverse }: {
-  label: string; value: number; target: number; unit: string; reverse: boolean;
-}) {
-  const pct   = Math.min((value / target) * 100, 150);
-  const color = getColor(value, target, reverse);
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 12 }}>
-        <span style={{ color: "var(--md-on-surface-variant)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 11 }}>{label}</span>
-        <span style={{ color, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontSize: 12 }}>
-          {Math.round(value * 10) / 10}
-          <span style={{ color: "var(--md-on-surface-variant)", fontWeight: 500 }}> / {target}{unit}</span>
-        </span>
-      </div>
-      <div className="progress-bar-track" style={{ height: 8 }}>
-        <div
-          className="progress-bar-fill"
-          style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: color, borderRadius: "var(--radius-full)" }}
-        />
-      </div>
-    </div>
-  );
+/** Convert ApiDay to the flat DaySnapshot shape used by DayTotals */
+function apiDayToSnapshot(day: ApiDay | null) {
+  if (!day) return {
+    calories: 0, protein: 0, carbs: 0, fat: 0, satFat: 0, fibre: 0,
+    addedSugar: 0, naturalSugar: 0, salt: 0, alcohol: 0, omega3: 0, steps: 0,
+  };
+  return {
+    calories:     day.totalCalories,
+    protein:      day.totalProtein,
+    carbs:        day.totalCarbs,
+    fat:          day.totalFat,
+    satFat:       day.totalSatFat,
+    fibre:        day.totalFibre,
+    addedSugar:   day.totalAddedSugar,
+    naturalSugar: day.totalNaturalSugar,
+    salt:         day.totalSalt,
+    alcohol:      day.totalAlcohol,
+    omega3:       day.totalOmega3,
+    steps:        day.totalSteps,
+  };
 }
 
 function DayCard({ day, onClick }: { day: ApiDay; onClick: () => void }) {
@@ -153,9 +151,11 @@ function DayCard({ day, onClick }: { day: ApiDay; onClick: () => void }) {
   );
 }
 
-function DayDetail({ day, date, onBack, onDateChange, onAddMeal, onUpdateMeal, onDeleteMeal, onStepsSave, savedMeals, onSaveTemplate, onDeleteSaved }: {
+function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddMeal, onUpdateMeal, onDeleteMeal, onStepsSave, savedMeals, onSaveTemplate, onDeleteSaved }: {
   day: ApiDay | null;
   date: string;
+  goals: Parameters<typeof DayTotals>[0]["goals"];
+  onGoalsSave: Parameters<typeof DayTotals>[0]["onGoalsSave"];
   onBack: () => void;
   onDateChange: (date: string) => void;
   onAddMeal: (date: string, values: MealFormValues) => Promise<void>;
@@ -169,8 +169,6 @@ function DayDetail({ day, date, onBack, onDateChange, onAddMeal, onUpdateMeal, o
   const [editingMeal, setEditingMeal] = useState<ApiMeal | null>(null);
   const [draftSteps, setDraftSteps] = useState("");
   const [stepsSaved, setStepsSaved] = useState(false);
-  const score = day ? getDayScore(day) : 0;
-  const { emoji, label, cls } = scoreInfo(score);
 
   const today = localISODate();
   const isToday = date === today;
@@ -266,34 +264,14 @@ function DayDetail({ day, date, onBack, onDateChange, onAddMeal, onUpdateMeal, o
         />
       </div>
 
-      {/* Day summary card */}
-      <div className="card" style={{ background: "var(--md-surface-container)" }}>
-        <div style={{ padding: "var(--space-6)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-6)" }}>
-            <div>
-              <h2 style={{ fontSize: "1.25rem", letterSpacing: "-0.03em", fontWeight: 800 }}>{formatDate(date)}</h2>
-              <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 4 }}>
-                {day ? `${day.meals.length} meal${day.meals.length !== 1 ? "s" : ""}` : "No meals logged yet"}
-                {day && day.totalSteps > 0 && ` · ${day.totalSteps.toLocaleString()} steps`}
-              </div>
-            </div>
-            {day && <span className={`score-chip ${cls}`} style={{ fontSize: 13 }}>{emoji} {label}</span>}
-          </div>
-
-          {day ? (
-            <div className="stack" style={{ gap: "var(--space-2)" }}>
-              {(Object.entries(TARGETS) as [TargetKey, typeof TARGETS[TargetKey]][]).map(([key, cfg]) => {
-                const val = day[`total${key.charAt(0).toUpperCase() + key.slice(1)}` as keyof ApiDay] as number ?? 0;
-                return <MacroBar key={key} label={cfg.label} value={val} target={cfg.target} unit={cfg.unit} reverse={cfg.reverse} />;
-              })}
-            </div>
-          ) : (
-            <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)" }}>
-              No nutrition data logged for this day — add a meal below to get started.
-            </p>
-          )}
-        </div>
-      </div>
+      {/* Day summary — reuses the same DayTotals component as Today */}
+      <DayTotals
+        totals={apiDayToSnapshot(day)}
+        goals={goals}
+        mealCount={day?.meals.length ?? 0}
+        selectedDate={date}
+        onGoalsSave={onGoalsSave}
+      />
 
       {/* Meals list with consistent MealItem display */}
       <MealList
@@ -392,23 +370,7 @@ export default function HomePage() {
     }
   }, [refreshAll]);
 
-  const totals = selectedDay
-    ? {
-        calories:     selectedDay.totalCalories,
-        protein:      selectedDay.totalProtein,
-        carbs:        selectedDay.totalCarbs,
-        fat:          selectedDay.totalFat,
-        satFat:       selectedDay.totalSatFat,
-        fibre:        selectedDay.totalFibre,
-        addedSugar:   selectedDay.totalAddedSugar,
-        naturalSugar: selectedDay.totalNaturalSugar,
-        salt:         selectedDay.totalSalt,
-        alcohol:      selectedDay.totalAlcohol,
-        omega3:       selectedDay.totalOmega3,
-        steps:        selectedDay.totalSteps,
-      }
-    : { calories: 0, protein: 0, carbs: 0, fat: 0, satFat: 0, fibre: 0,
-        addedSugar: 0, naturalSugar: 0, salt: 0, alcohol: 0, omega3: 0, steps: 0 };
+  const totals = apiDayToSnapshot(selectedDay ?? null);
 
   const handleAdd = useCallback(
     (values: MealFormValues) => addMeal(selectedDate, values),
@@ -682,6 +644,8 @@ export default function HomePage() {
           <DayDetail
             day={allDays.find((d) => d.date === historyDate) ?? null}
             date={historyDate}
+            goals={goals}
+            onGoalsSave={updateGoals}
             onBack={() => { setHistoryDate(null); window.scrollTo({ top: 0 }); }}
             onDateChange={navigateToHistoryDate}
             onAddMeal={addMeal}

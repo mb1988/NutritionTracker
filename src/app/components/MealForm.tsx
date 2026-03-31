@@ -150,106 +150,106 @@ export function MealForm({
 
       {!collapsed && (
         <>
-      {/* Saved meal picker */}
-      {!isEditing && savedMeals && savedMeals.length > 0 && onDeleteSaved && (
-        <div style={{ marginBottom: "var(--space-6)" }}>
-          <SavedMealPicker savedMeals={savedMeals} onSelect={loadSavedMeal} onDelete={onDeleteSaved} />
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="stack" style={{ gap: "var(--space-5)" }}>
-        {/* Meal name */}
-        <div className="macro-input">
-          <label htmlFor="meal-name">Meal name</label>
-          <input
-            id="meal-name"
-            type="text"
-            placeholder="e.g. Chicken and rice"
-            value={values.name}
-            onChange={(e) => setField("name", e.target.value)}
-            autoComplete="off"
-            style={{ fontSize: "1rem", fontWeight: 600 }}
-          />
-        </div>
-
-        {/* Category chips */}
-        <div>
-          <label>Category</label>
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-2)" }}>
-            <button
-              type="button"
-              onClick={() => setField("category", "")}
-              style={{
-                padding: "6px 14px", borderRadius: "var(--radius-full)", border: "none",
-                background: values.category === null ? "var(--md-surface-bright)" : "var(--md-surface-container-highest)",
-                color: values.category === null ? "var(--md-on-surface)" : "var(--md-on-surface-variant)",
-                fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer",
-                transition: "background var(--transition), color var(--transition)",
-              }}
-            >— None</button>
-            {MEAL_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setValues((prev) => ({ ...prev, category: cat }))}
-                style={{
-                  padding: "6px 14px", borderRadius: "var(--radius-full)", border: "none",
-                  background: values.category === cat ? "var(--md-tertiary-container)" : "var(--md-surface-container-highest)",
-                  color: values.category === cat ? "var(--md-on-tertiary-container)" : "var(--md-on-surface-variant)",
-                  fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer",
-                  transition: "background var(--transition), color var(--transition)",
-                }}
-              >{CATEGORY_ICONS[cat]} {cat}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* All nutrient fields – always visible */}
-        <div>
-          <p className="form-section-label" style={{ marginBottom: "var(--space-3)" }}>Nutrients</p>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
-            gap: "var(--space-3)",
-          }}>
-            {ALL_FIELDS.map(({ key, label }) => (
-              <MacroInput
-                key={key}
-                id={"meal-" + key}
-                label={label}
-                value={values[key] as number}
-                onChange={(raw) => setField(key, raw)}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="alert-error"><span>⚠️</span><span>{error}</span></div>
-        )}
-
-        {/* Actions */}
-        <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-3)" }}>
-          <div className="row gap-3">
-            <button type="submit" className="btn-primary">
-              {isEditing ? "Save changes" : "Add meal"}
-            </button>
-            {onCancel && !isEditing && (
-              <button type="button" className="btn-ghost" onClick={onCancel}>Cancel</button>
-            )}
-          </div>
-          {onSaveTemplate && (
-            <button
-              type="button"
-              className={saved ? "btn-tonal btn-sm" : "btn-ghost btn-sm"}
-              onClick={handleSaveTemplate}
-            >
-              {saved ? "✓ Saved!" : isEditing ? "Save as template" : "Save template"}
-            </button>
+          {/* Saved meal picker */}
+          {!isEditing && savedMeals && savedMeals.length > 0 && onDeleteSaved && (
+            <div style={{ marginBottom: "var(--space-6)" }}>
+              <SavedMealPicker savedMeals={savedMeals} onSelect={loadSavedMeal} onDelete={onDeleteSaved} />
+            </div>
           )}
-        </div>
-      </form>
+
+          <form onSubmit={handleSubmit} className="stack" style={{ gap: "var(--space-5)" }}>
+            {/* Meal name */}
+            <div className="macro-input">
+              <label htmlFor="meal-name">Meal name</label>
+              <input
+                id="meal-name"
+                type="text"
+                placeholder="e.g. Chicken and rice"
+                value={values.name}
+                onChange={(e) => setField("name", e.target.value)}
+                autoComplete="off"
+                style={{ fontSize: "1rem", fontWeight: 600 }}
+              />
+            </div>
+
+            {/* Category chips */}
+            <div>
+              <label>Category</label>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-2)" }}>
+                <button
+                  type="button"
+                  onClick={() => setField("category", "")}
+                  style={{
+                    padding: "6px 14px", borderRadius: "var(--radius-full)", border: "none",
+                    background: values.category === null ? "var(--md-surface-bright)" : "var(--md-surface-container-highest)",
+                    color: values.category === null ? "var(--md-on-surface)" : "var(--md-on-surface-variant)",
+                    fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer",
+                    transition: "background var(--transition), color var(--transition)",
+                  }}
+                >— None</button>
+                {MEAL_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setValues((prev) => ({ ...prev, category: cat }))}
+                    style={{
+                      padding: "6px 14px", borderRadius: "var(--radius-full)", border: "none",
+                      background: values.category === cat ? "var(--md-tertiary-container)" : "var(--md-surface-container-highest)",
+                      color: values.category === cat ? "var(--md-on-tertiary-container)" : "var(--md-on-surface-variant)",
+                      fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer",
+                      transition: "background var(--transition), color var(--transition)",
+                    }}
+                  >{CATEGORY_ICONS[cat]} {cat}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* All nutrient fields */}
+            <div>
+              <p className="form-section-label" style={{ marginBottom: "var(--space-3)" }}>Nutrients</p>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                gap: "var(--space-3)",
+              }}>
+                {ALL_FIELDS.map(({ key, label }) => (
+                  <MacroInput
+                    key={key}
+                    id={"meal-" + key}
+                    label={label}
+                    value={values[key] as number}
+                    onChange={(raw) => setField(key, raw)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="alert-error"><span>⚠️</span><span>{error}</span></div>
+            )}
+
+            {/* Actions */}
+            <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-3)" }}>
+              <div className="row gap-3">
+                <button type="submit" className="btn-primary">
+                  {isEditing ? "Save changes" : "Add meal"}
+                </button>
+                {onCancel && !isEditing && (
+                  <button type="button" className="btn-ghost" onClick={onCancel}>Cancel</button>
+                )}
+              </div>
+              {onSaveTemplate && (
+                <button
+                  type="button"
+                  className={saved ? "btn-tonal btn-sm" : "btn-ghost btn-sm"}
+                  onClick={handleSaveTemplate}
+                >
+                  {saved ? "✓ Saved!" : isEditing ? "Save as template" : "Save template"}
+                </button>
+              )}
+            </div>
+          </form>
         </>
       )}
     </div>
