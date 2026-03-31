@@ -94,11 +94,15 @@ const MACRO_ROWS: Array<{
   { key: "omega3",       goalKey: "omega3",       label: "Omega-3",       unit: "mg", reverse: true },
 ];
 
+function localISODate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave }: Props) {
   const remaining = Math.max(0, goals.calories - totals.calories);
   const isOver    = totals.calories > goals.calories;
-  const todayIso  = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
-  const isToday   = selectedDate === todayIso;
+  const isToday   = selectedDate === localISODate();
   const title     = isToday ? "Today’s Progress" : `Progress for ${formatDisplayDate(selectedDate)}`;
 
   return (
