@@ -287,6 +287,8 @@ function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddM
         mealCount={day?.meals.length ?? 0}
         selectedDate={date}
         onGoalsSave={onGoalsSave}
+        meals={(day?.meals ?? []).map(({ id: _id, createdAt: _createdAt, ...meal }) => meal)}
+        savedMeals={savedMeals.map(({ id: _id, ...meal }) => meal)}
       />
 
       {/* Meals list with consistent MealItem display */}
@@ -585,6 +587,8 @@ export default function HomePage() {
             mealCount={selectedDay?.meals.length ?? 0}
             selectedDate={selectedDate}
             onGoalsSave={updateGoals}
+            meals={(selectedDay?.meals ?? []).map(({ id: _id, createdAt: _createdAt, ...meal }) => meal)}
+            savedMeals={savedMeals.map(({ id: _id, ...meal }) => meal)}
           />
 
           <div className="stack" style={{ gap: "var(--space-3)" }}>

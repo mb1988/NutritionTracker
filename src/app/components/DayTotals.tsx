@@ -1,7 +1,8 @@
 "use client";
 
-import { type DaySnapshot, type DailyGoals } from "@/app/types";
+import { type DaySnapshot, type DailyGoals, type MealFormValues } from "@/app/types";
 import { GoalsPanel } from "@/app/components/GoalsPanel";
+import { DailyFoodSuggestions } from "@/app/components/DailyFoodSuggestions";
 
 type Props = {
   totals:      DaySnapshot;
@@ -9,6 +10,8 @@ type Props = {
   mealCount:   number;
   selectedDate: string;
   onGoalsSave: (g: DailyGoals) => void;
+  meals?: MealFormValues[];
+  savedMeals?: MealFormValues[];
 };
 
 function formatDisplayDate(iso: string): string {
@@ -99,7 +102,7 @@ function localISODate(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave }: Props) {
+export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave, meals = [], savedMeals = [] }: Props) {
   const remaining = Math.max(0, goals.calories - totals.calories);
   const isOver    = totals.calories > goals.calories;
   const isToday   = selectedDate === localISODate();
@@ -121,6 +124,16 @@ export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave 
         </div>
         <GoalsPanel goals={goals} onSave={onGoalsSave} />
       </div>
+
+      {isToday && (
+        <DailyFoodSuggestions
+          selectedDate={selectedDate}
+          goals={goals}
+          totals={totals}
+          meals={meals}
+          savedMeals={savedMeals}
+        />
+      )}
 
       {/* All macro bars */}
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
