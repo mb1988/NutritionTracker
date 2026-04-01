@@ -61,12 +61,14 @@ export function MealForm({
   const [modelTier, setModelTier] = useState<AssistModelTier>("accurate");
   const [assistMessage, setAssistMessage] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [quickFillTipsOpen, setQuickFillTipsOpen] = useState(false);
 
   useEffect(() => {
     setValues(initialValues ?? EMPTY_FORM_VALUES);
     setError(null);
     setSaved(false);
     setAssistMessage(null);
+    setQuickFillTipsOpen(false);
     if (initialValues) setCollapsed(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialValues]);
@@ -86,6 +88,7 @@ export function MealForm({
     setLookupAmount("");
     setAssistMessage(null);
     setScannerOpen(false);
+    setQuickFillTipsOpen(false);
   }
 
   function applyAutofill(data: MealFormValues, message: string) {
@@ -285,200 +288,163 @@ export function MealForm({
         <>
           {/* AI estimation */}
           {!isEditing && (
-            <div style={{
-              marginBottom: "var(--space-5)",
-              padding: "var(--space-4) var(--space-5)",
-              borderRadius: "var(--radius-lg)",
-              background: "linear-gradient(135deg, rgba(104,185,132,0.06) 0%, rgba(104,185,132,0.02) 100%)",
-              border: "1px solid rgba(104,185,132,0.15)",
-            }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: "var(--space-2)",
-                marginBottom: "var(--space-3)",
-              }}>
-                <span style={{ fontSize: "1.1rem" }}>✨</span>
-                <span style={{
-                  fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase",
-                  letterSpacing: "0.06em", color: "var(--md-primary)",
-                }}>
-                  Quick fill
-                </span>
+            <div className="quick-fill">
+              <div className="quick-fill__header">
+                <div className="quick-fill__header-main">
+                  <span className="quick-fill__sparkle" aria-hidden="true">✨</span>
+                  <div>
+                    <span className="quick-fill__eyebrow">Quick fill</span>
+                    <p className="quick-fill__summary">Look up a product first, or describe the meal for assisted fill.</p>
+                  </div>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBottom: "var(--space-3)", flexWrap: "wrap" }}>
-                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--md-on-surface-variant)" }} htmlFor="meal-model-tier">
-                  Assistant mode
-                </label>
-                <select
-                  id="meal-model-tier"
-                  value={modelTier}
-                  onChange={(e) => setModelTier(e.target.value as AssistModelTier)}
-                  disabled={aiLoading}
-                  style={{
-                    borderRadius: "var(--radius-full)",
-                    border: "1px solid var(--md-outline-variant)",
-                    background: "var(--md-surface-container)",
-                    color: "var(--md-on-surface)",
-                    padding: "8px 12px",
-                    fontSize: "0.8125rem",
-                    fontWeight: 600,
-                  }}
-                >
-                  <option value="accurate">Best accuracy · GPT-4o</option>
-                  <option value="balanced">Lower cost · GPT-4o mini</option>
-                </select>
+
+              <div className="quick-fill__sections">
+                <section className="quick-fill__section">
+                  <div className="quick-fill__section-top">
+                    <div className="quick-fill__title-wrap">
+                      <span className="quick-fill__icon" aria-hidden="true">🏷️</span>
+                      <span className="quick-fill__title">Product lookup</span>
+                    </div>
+                    <span className="quick-fill__meta">Barcode or name</span>
+                  </div>
+
+                  <div className="quick-fill__row quick-fill__row--lookup">
+                    <input
+                      type="text"
+                      className="quick-fill__input"
+                      placeholder="Paste barcode or type product name"
+                      value={productLookup}
+                      onChange={(e) => setProductLookup(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleProductLookup();
+                        }
+                      }}
+                      disabled={aiLoading}
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      step="1"
+                      className="quick-fill__input quick-fill__input--amount"
+                      placeholder="g/ml"
+                      value={lookupAmount}
+                      onChange={(e) => setLookupAmount(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleProductLookup();
+                        }
+                      }}
+                      disabled={aiLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleProductLookup()}
+                      disabled={aiLoading || !productLookup.trim()}
+                      className="btn-tonal btn-sm quick-fill__action"
+                    >
+                      {aiLoading ? "Looking…" : "Find"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScannerOpen((open) => !open)}
+                      disabled={aiLoading}
+                      className="btn-ghost btn-sm quick-fill__action"
+                    >
+                      {scannerOpen ? "Hide scanner" : "📷 Scan"}
+                    </button>
+                  </div>
+
+                  {scannerOpen && (
+                    <div className="quick-fill__scanner">
+                      <BarcodeScanner
+                        onDetected={handleScannerDetected}
+                        onClose={() => setScannerOpen(false)}
+                      />
+                    </div>
+                  )}
+                </section>
+
+                <section className="quick-fill__section">
+                  <div className="quick-fill__section-top quick-fill__section-top--assistant">
+                    <div className="quick-fill__title-wrap">
+                      <span className="quick-fill__icon" aria-hidden="true">🪄</span>
+                      <span className="quick-fill__title">Assistant mode</span>
+                    </div>
+
+                    <div className="quick-fill__mode">
+                      <label className="quick-fill__mode-label" htmlFor="meal-model-tier">Mode</label>
+                      <select
+                        id="meal-model-tier"
+                        className="quick-fill__select"
+                        value={modelTier}
+                        onChange={(e) => setModelTier(e.target.value as AssistModelTier)}
+                        disabled={aiLoading}
+                      >
+                        <option value="accurate">Best accuracy · GPT-4o</option>
+                        <option value="balanced">Lower cost · GPT-4o mini</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="quick-fill__row quick-fill__row--assistant">
+                    <input
+                      type="text"
+                      className="quick-fill__input quick-fill__input--description"
+                      placeholder="e.g. chicken breast, rice, broccoli"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAiEstimate();
+                        }
+                      }}
+                      disabled={aiLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAiEstimate}
+                      disabled={aiLoading || !aiPrompt.trim()}
+                      className="btn-primary btn-sm quick-fill__action"
+                    >
+                      {aiLoading ? "Filling…" : "Fill form"}
+                    </button>
+                  </div>
+
+                </section>
               </div>
-              <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                <input
-                  type="text"
-                  placeholder="e.g. 200g chicken breast with rice and broccoli"
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") { e.preventDefault(); handleAiEstimate(); }
-                  }}
-                  disabled={aiLoading}
-                  style={{
-                    flex: 1,
-                    fontSize: "0.9375rem",
-                    fontWeight: 500,
-                    background: "var(--md-surface-container)",
-                    border: "1px solid var(--md-outline-variant)",
-                    borderRadius: "var(--radius-full)",
-                    padding: "10px var(--space-4)",
-                    color: "var(--md-on-surface)",
-                    outline: "none",
-                  }}
-                />
+
+              <div className="quick-fill__tips">
                 <button
                   type="button"
-                  onClick={handleAiEstimate}
-                  disabled={aiLoading || !aiPrompt.trim()}
-                  className="btn-primary btn-sm"
-                  style={{
-                    borderRadius: "var(--radius-full)",
-                    padding: "10px var(--space-5)",
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
+                  className="quick-fill__tips-toggle"
+                  onClick={() => setQuickFillTipsOpen((open) => !open)}
+                  aria-expanded={quickFillTipsOpen}
                 >
-                  {aiLoading ? "Filling…" : "✨ Fill from description"}
-                </button>
-              </div>
-              <p style={{
-                fontSize: "0.6875rem", color: "var(--md-on-surface-variant)",
-                marginTop: "var(--space-2)", lineHeight: 1.4,
-              }}>
-                Describe what you ate and include rough amounts. The app checks food database matches first, then fills any gaps with AI.
-              </p>
-              <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{
-                  display: "flex", alignItems: "center", gap: "var(--space-2)",
-                  marginBottom: "var(--space-3)",
-                }}>
-                  <span style={{ fontSize: "1rem" }}>🏷️</span>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--md-on-surface-variant)" }}>
-                    Product lookup
+                  <span>{quickFillTipsOpen ? "Hide quick-fill tips" : "Show quick-fill tips"}</span>
+                  <span className={quickFillTipsOpen ? "quick-fill__tips-caret quick-fill__tips-caret--open" : "quick-fill__tips-caret"} aria-hidden="true">
+                    ▼
                   </span>
-                </div>
-                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                  <input
-                    type="text"
-                    placeholder="Paste barcode or type product name"
-                    value={productLookup}
-                    onChange={(e) => setProductLookup(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void handleProductLookup();
-                      }
-                    }}
-                    disabled={aiLoading}
-                    style={{
-                      flex: 1,
-                      minWidth: 220,
-                      fontSize: "0.9375rem",
-                      fontWeight: 500,
-                      background: "var(--md-surface-container)",
-                      border: "1px solid var(--md-outline-variant)",
-                      borderRadius: "var(--radius-full)",
-                      padding: "10px var(--space-4)",
-                      color: "var(--md-on-surface)",
-                      outline: "none",
-                    }}
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    step="1"
-                    placeholder="g/ml"
-                    value={lookupAmount}
-                    onChange={(e) => setLookupAmount(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void handleProductLookup();
-                      }
-                    }}
-                    disabled={aiLoading}
-                    style={{
-                      width: 92,
-                      fontSize: "0.9375rem",
-                      fontWeight: 600,
-                      background: "var(--md-surface-container)",
-                      border: "1px solid var(--md-outline-variant)",
-                      borderRadius: "var(--radius-full)",
-                      padding: "10px 12px",
-                      color: "var(--md-on-surface)",
-                      outline: "none",
-                      textAlign: "center",
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void handleProductLookup()}
-                    disabled={aiLoading || !productLookup.trim()}
-                    className="btn-tonal btn-sm"
-                    style={{ borderRadius: "var(--radius-full)", padding: "10px var(--space-5)", whiteSpace: "nowrap" }}
-                  >
-                      {aiLoading ? "Looking up…" : "Find product"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScannerOpen((open) => !open)}
-                    disabled={aiLoading}
-                    className="btn-ghost btn-sm"
-                    style={{ borderRadius: "var(--radius-full)", padding: "10px var(--space-5)", whiteSpace: "nowrap" }}
-                  >
-                    {scannerOpen ? "Hide scanner" : "📷 Scan with camera"}
-                  </button>
-                </div>
-                <p style={{
-                  fontSize: "0.6875rem",
-                  color: "var(--md-on-surface-variant)",
-                  marginTop: "var(--space-2)",
-                  lineHeight: 1.4,
-                }}>
-                  Enter grams or ml eaten. Leave it blank to use the serving size when available, otherwise 100g/100ml.
-                </p>
-                {scannerOpen && (
-                  <div style={{ marginTop: "var(--space-3)" }}>
-                    <BarcodeScanner
-                      onDetected={handleScannerDetected}
-                      onClose={() => setScannerOpen(false)}
-                    />
+                </button>
+
+                {quickFillTipsOpen && (
+                  <div className="quick-fill__tips-panel">
+                    <p className="quick-fill__hint">
+                      Product lookup: add an optional amount in g/ml. If left blank, the app uses the serving size or 100g/100ml.
+                    </p>
+                    <p className="quick-fill__hint">
+                      Assistant mode: include rough amounts for the best match. The app checks food data first, then fills any gaps with AI.
+                    </p>
                   </div>
                 )}
               </div>
+
               {assistMessage && (
-                <div style={{
-                  marginTop: "var(--space-3)",
-                  padding: "10px 12px",
-                  borderRadius: "var(--radius-md)",
-                  background: "rgba(104, 185, 132, 0.12)",
-                  color: "var(--md-primary)",
-                  fontSize: "0.75rem",
-                  fontWeight: 700,
-                }}>
+                <div className="quick-fill__feedback">
                   ✓ {assistMessage}
                 </div>
               )}
