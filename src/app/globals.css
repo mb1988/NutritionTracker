@@ -318,6 +318,104 @@ hr {
   margin-top: 2px;
 }
 
+.barcode-scanner {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.barcode-scanner__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.barcode-scanner__eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--md-on-surface-variant);
+}
+
+.barcode-scanner__status {
+  font-size: 0.8125rem;
+  color: var(--md-on-surface);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.barcode-scanner__viewport {
+  position: relative;
+  min-height: 220px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #050605;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.barcode-scanner__video,
+.barcode-scanner__placeholder {
+  width: 100%;
+  height: 220px;
+}
+
+.barcode-scanner__video {
+  object-fit: cover;
+  display: block;
+}
+
+.barcode-scanner__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--md-on-surface-variant);
+  text-align: center;
+  padding: var(--space-4);
+}
+
+.barcode-scanner__placeholder p {
+  max-width: 26rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.barcode-scanner__guide {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.barcode-scanner__guide::before {
+  content: "";
+  width: min(78%, 320px);
+  height: 108px;
+  border: 2px solid rgba(104, 185, 132, 0.75);
+  border-radius: 18px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.22);
+}
+
+.barcode-scanner__guide-line {
+  position: absolute;
+  width: min(70%, 280px);
+  height: 2px;
+  background: linear-gradient(90deg, rgba(104,185,132,0) 0%, rgba(104,185,132,0.9) 50%, rgba(104,185,132,0) 100%);
+  box-shadow: 0 0 18px rgba(104,185,132,0.55);
+}
+
+.barcode-scanner__hint {
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
+  line-height: 1.4;
+}
+
 /* ─── Tabs (pill style) ───────────────────────────────────── */
 .tab-bar {
   display: flex;

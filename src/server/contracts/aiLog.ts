@@ -1,9 +1,43 @@
 import { z } from "zod";
 
 // ── Request ───────────────────────────────────────────────────
-export const aiLogRequestSchema = z.object({
+export const aiModelTierSchema = z.enum(["balanced", "accurate"]);
+
+const amountSchema = z.coerce.number().positive().max(5000);
+
+const describeRequestSchema = z.object({
+  mode: z.literal("describe"),
   description: z.string().trim().min(2).max(1000),
+  modelTier: aiModelTierSchema.default("accurate"),
 });
+
+const barcodeRequestSchema = z.object({
+  mode: z.literal("barcode"),
+  barcode: z.string().trim().regex(/^\d{8,14}$/),
+  amount: amountSchema.optional(),
+  modelTier: aiModelTierSchema.default("accurate"),
+});
+
+const productSearchRequestSchema = z.object({
+  mode: z.literal("productSearch"),
+  query: z.string().trim().min(2).max(120),
+  amount: amountSchema.optional(),
+  modelTier: aiModelTierSchema.default("accurate"),
+});
+
+export const aiLogRequestSchema = z.preprocess((raw) => {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const value = raw as Record<string, unknown>;
+    if (!value.mode && typeof value.description === "string") {
+      return { ...value, mode: "describe" };
+    }
+  }
+  return raw;
+}, z.discriminatedUnion("mode", [
+  describeRequestSchema,
+  barcodeRequestSchema,
+  productSearchRequestSchema,
+]));
 
 // ── AI response shape — matches MealFormValues exactly ────────
 export const aiLogResponseSchema = z.object({
@@ -24,4 +58,5 @@ export const aiLogResponseSchema = z.object({
 
 export type AiLogRequest  = z.infer<typeof aiLogRequestSchema>;
 export type AiLogResponse = z.infer<typeof aiLogResponseSchema>;
+export type AiModelTier = z.infer<typeof aiModelTierSchema>;
 

@@ -7,8 +7,8 @@ export async function POST(request: NextRequest) {
   try {
     await getAuthenticatedUserId(); // auth gate — no DB write, just verify access
     const body = await request.json();
-    const { description } = aiLogRequestSchema.parse(body);
-    const result = await estimateNutrition(description);
+    const input = aiLogRequestSchema.parse(body);
+    const result = await estimateNutrition(input);
     return NextResponse.json(result);
   } catch (error) {
     return handleApiError(error);

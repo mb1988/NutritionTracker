@@ -11,6 +11,9 @@ Try it instantly — no sign-up required. Demo mode provides full functionality 
 
 ### Daily Logging
 - Log meals with 11 tracked nutrients: calories, protein, carbs, fat, sat fat, fibre, added sugar, natural sugar, salt, alcohol, and omega-3
+- Hybrid meal autofill: Open Food Facts lookup for packaged foods first, then AI completion/fallback for missing fields and mixed meals
+- Paste a barcode or product name to autofill packaged foods from Open Food Facts, with optional g/ml override
+- Camera barcode scan inside the Log meal section on supported browsers, with manual paste fallback everywhere else
 - Per-meal **health-coloured badges** (green / orange / red) based on NHS reference intake guidelines
 - Edit and delete individual meals inline
 - Track daily steps
@@ -105,7 +108,8 @@ OPENAI_API_KEY=
 | `ALLOWED_GITHUB_USERNAME` | Restricts authenticated access to a single GitHub account |
 | `NEXTAUTH_SECRET` | Secret used to sign NextAuth session tokens |
 | `NEXTAUTH_URL` | Full public URL of the app (e.g. `https://yourapp.up.railway.app`) |
-| `OPENAI_API_KEY` | OpenAI API key for AI-powered meal logging (`gpt-4o-mini`) |
+| `OPENAI_API_KEY` | OpenAI API key for AI-powered meal logging (`gpt-4o` by default). Packaged-food lookup via Open Food Facts does not require a key. |
+| `OPENAI_MODEL` | Optional override for the default AI model used by the meal assistant. If unset, the default mode uses `gpt-4o` and the lower-cost mode uses `gpt-4o-mini`. |
 
 ---
 
@@ -163,7 +167,20 @@ All routes require an active session or a valid demo cookie. Data is scoped to t
 | `DELETE` | `/api/saved-meals/:id` | Delete a saved meal template |
 | `POST` | `/api/saved-meals/use` | Add a saved meal to a specific day |
 | `POST` | `/api/demo/reset` | Reset demo user data to sample defaults |
-| `POST` | `/api/ai-log` | AI-powered nutrition estimate from natural language (returns JSON, no DB write) |
+| `POST` | `/api/ai-log` | Hybrid nutrition estimate: packaged-food lookup via Open Food Facts first, then AI completion/fallback (returns JSON, no DB write) |
+
+`/api/ai-log` supports three request modes:
+
+- `describe` — free-text meals like `200g chicken breast with rice`
+- `productSearch` — packaged-food lookup by product name
+- `barcode` — packaged-food lookup by barcode without using AI tokens
+
+For model choice, the UI exposes:
+
+- `Default` → `gpt-4o`
+- `Lower cost` → `gpt-4o-mini`
+
+Camera scanning uses the browser's native camera + `BarcodeDetector` support, so it works best on modern Chromium-based mobile browsers over HTTPS or localhost. If unsupported, users can still paste the barcode manually.
 
 ---
 
