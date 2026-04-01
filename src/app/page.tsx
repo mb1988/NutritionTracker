@@ -11,6 +11,7 @@ import { DayTotals }     from "@/app/components/DayTotals";
 import { MealForm }      from "@/app/components/MealForm";
 import { MealList }      from "@/app/components/MealList";
 import { MetricSelector } from "@/app/components/MetricSelector";
+import { StepSyncPanel } from "@/app/components/StepSyncPanel";
 import { WeeklyChart }   from "@/app/components/WeeklyChart";
 import { TimePeriodSelector, type TimePeriod } from "@/app/components/TimePeriodSelector";
 import { DEMO_COOKIE } from "@/lib/demo";
@@ -48,6 +49,26 @@ function formatDate(iso: string) {
   return new Date(iso + "T12:00:00").toLocaleDateString("en-GB", {
     weekday: "short", day: "numeric", month: "short",
   });
+}
+
+function formatStepSyncText(stepSource?: string | null, stepsSyncedAt?: string | null) {
+  const isSynced = stepSource === "ios-shortcuts" || stepSource === "android-health-connect";
+  if (!isSynced) return null;
+
+  const providerLabel = stepSource === "ios-shortcuts" ? "iPhone" : "Android";
+  if (!stepsSyncedAt) return `Auto-synced from ${providerLabel}`;
+
+  const syncedAt = new Date(stepsSyncedAt);
+  const formatted = Number.isNaN(syncedAt.getTime())
+    ? null
+    : syncedAt.toLocaleString("en-GB", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+  return formatted ? `Auto-synced from ${providerLabel} · ${formatted}` : `Auto-synced from ${providerLabel}`;
 }
 
 function getColor(value: number, target: number, reverse: boolean) {
@@ -205,6 +226,7 @@ function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddM
 
   const currentSteps = day?.totalSteps ?? 0;
   const displaySteps = draftSteps !== "" ? draftSteps : currentSteps > 0 ? String(currentSteps) : "";
+  const stepSyncText = formatStepSyncText(day?.stepsSource, day?.stepsSyncedAt);
 
   return (
     <div className="stack" style={{ gap: "var(--space-5)" }}>
@@ -243,26 +265,33 @@ function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddM
         </div>
 
         {/* Steps */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
-            👟 Steps
-          </span>
-          <input
-            type="number"
-            min={0}
-            max={100000}
-            step={500}
-            placeholder="0"
-            value={displaySteps}
-            onChange={(e) => setDraftSteps(e.target.value)}
-            onBlur={handleStepsSubmit}
-            onKeyDown={(e) => e.key === "Enter" && handleStepsSubmit()}
-            style={{ width: 90, textAlign: "right" }}
-            className="date-picker__input"
-            aria-label="Daily steps"
-          />
-          {stepsSaved && (
-            <span style={{ fontSize: "0.75rem", color: "var(--md-primary-container)", fontWeight: 700 }}>✓</span>
+        <div style={{ display: "grid", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+              👟 Steps
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={100000}
+              step={500}
+              placeholder="0"
+              value={displaySteps}
+              onChange={(e) => setDraftSteps(e.target.value)}
+              onBlur={handleStepsSubmit}
+              onKeyDown={(e) => e.key === "Enter" && handleStepsSubmit()}
+              style={{ width: 90, textAlign: "right" }}
+              className="date-picker__input"
+              aria-label="Daily steps"
+            />
+            {stepsSaved && (
+              <span style={{ fontSize: "0.75rem", color: "var(--md-primary-container)", fontWeight: 700 }}>✓</span>
+            )}
+          </div>
+          {stepSyncText && (
+            <span style={{ fontSize: "0.6875rem", color: "var(--md-primary)", fontWeight: 600 }}>
+              {stepSyncText}
+            </span>
           )}
         </div>
 
@@ -570,6 +599,8 @@ export default function HomePage() {
           <DatePicker
             date={selectedDate}
             steps={selectedDay?.totalSteps ?? 0}
+            stepSource={selectedDay?.stepsSource ?? null}
+            stepsSyncedAt={selectedDay?.stepsSyncedAt ?? null}
             onChange={(d) => {
               if (d === todayISO()) {
                 setSelectedDate(d);
@@ -580,6 +611,10 @@ export default function HomePage() {
             }}
             onStepsSave={(steps) => updateSteps(selectedDate, steps)}
           />
+
+          {Boolean(session?.user) && (
+            <StepSyncPanel enabled onRefreshData={refreshAll} />
+          )}
 
           <DayTotals
             totals={totals}

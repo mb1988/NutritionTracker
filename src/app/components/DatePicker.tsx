@@ -5,6 +5,9 @@ import { useState } from "react";
 type Props = {
   date:        string;
   steps:       number;
+  stepSource?: string | null;
+  stepsSyncedAt?: string | null;
+  stepSyncEnabled?: boolean;
   onChange:    (date: string) => void;
   onStepsSave: (steps: number) => void;
 };
@@ -29,7 +32,7 @@ function offsetDate(iso: string, delta: number): string {
   return `${y}-${m}-${day}`;
 }
 
-export function DatePicker({ date, steps, onChange, onStepsSave }: Props) {
+export function DatePicker({ date, steps, stepSource, stepsSyncedAt, stepSyncEnabled, onChange, onStepsSave }: Props) {
   const [draftSteps, setDraftSteps] = useState<string>(steps > 0 ? String(steps) : "");
   const [saved,      setSaved]      = useState(false);
 
@@ -85,27 +88,35 @@ export function DatePicker({ date, steps, onChange, onStepsSave }: Props) {
       </div>
 
       {/* Steps */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
-          👟 Steps
-        </span>
-        <input
-          type="number"
-          min={0}
-          max={100000}
-          step={500}
-          placeholder="0"
-          value={displaySteps}
-          onChange={(e) => setDraftSteps(e.target.value)}
-          onBlur={handleStepsSubmit}
-          onKeyDown={(e) => e.key === "Enter" && handleStepsSubmit()}
-          style={{ width: 90, textAlign: "right" }}
-          className="date-picker__input"
-          aria-label="Daily steps"
+      <div style={{ display: "grid", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+            👟 Steps
+          </span>
+          <input
+            type="number"
+            min={0}
+            max={100000}
+            step={500}
+            placeholder="0"
+            value={displaySteps}
+            onChange={(e) => setDraftSteps(e.target.value)}
+            onBlur={handleStepsSubmit}
+            onKeyDown={(e) => e.key === "Enter" && handleStepsSubmit()}
+            style={{ width: 90, textAlign: "right" }}
+            className="date-picker__input"
+            aria-label="Daily steps"
+          />
+          {saved && (
+            <span style={{ fontSize: "0.75rem", color: "var(--md-primary-container)", fontWeight: 700 }}>✓</span>
+          )}
+        </div>
+        <StepSyncNote
+          stepSource={stepSource}
+          stepsSyncedAt={stepsSyncedAt}
+          stepSyncEnabled={stepSyncEnabled}
+          isToday={isToday}
         />
-        {saved && (
-          <span style={{ fontSize: "0.75rem", color: "var(--md-primary-container)", fontWeight: 700 }}>✓</span>
-        )}
       </div>
 
       {/* Date input */}
@@ -119,3 +130,42 @@ export function DatePicker({ date, steps, onChange, onStepsSave }: Props) {
     </div>
   );
 }
+
+function StepSyncNote({
+  stepSource,
+  stepsSyncedAt,
+  stepSyncEnabled,
+  isToday,
+}: {
+  stepSource?: string | null;
+  stepsSyncedAt?: string | null;
+  stepSyncEnabled?: boolean;
+  isToday: boolean;
+}) {
+  const hasSyncedSteps = stepSource === "ios-shortcuts" || stepSource === "android-health-connect";
+  const label = hasSyncedSteps
+    ? `Auto-synced${stepsSyncedAt ? ` · ${formatShortDateTime(stepsSyncedAt)}` : ""}`
+    : stepSyncEnabled && isToday
+      ? "Auto-sync connected · manual edit overrides if needed"
+      : null;
+
+  if (!label) return null;
+
+  return (
+    <span style={{ fontSize: "0.6875rem", color: hasSyncedSteps ? "var(--md-primary)" : "var(--md-on-surface-variant)", fontWeight: 600 }}>
+      {label}
+    </span>
+  );
+}
+
+function formatShortDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "just now";
+  return date.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+

@@ -23,10 +23,11 @@ export async function middleware(req: NextRequest) {
  *  - /login          (the sign-in page itself)
  *  - /api/auth/*     (NextAuth callbacks & CSRF)
  *  - /api/demo/*     (demo setup — must be reachable pre-auth)
+ *  - /api/steps/sync (token-authenticated webhook for phone step sync)
  *  - /_next/*        (Next.js static files)
  *  - /favicon.ico
  */
 export const config = {
-  matcher: ["/((?!login|api/auth|api/demo|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|api/auth|api/demo|api/steps/sync|_next/static|_next/image|favicon.ico).*)"],
 };
 

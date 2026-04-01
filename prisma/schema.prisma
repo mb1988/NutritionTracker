@@ -8,15 +8,20 @@ datasource db {
 }
 
 model User {
-  id         String      @id @default(cuid())
-  email      String?     @unique
-  name       String?
-  image      String?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  days       Day[]
-  meals      Meal[]
-  savedMeals SavedMeal[]
+  id                 String      @id @default(cuid())
+  email              String?     @unique
+  name               String?
+  image              String?
+  stepSyncEnabled    Boolean     @default(false)
+  stepSyncProvider   String?
+  stepSyncTokenHash  String?     @unique
+  stepSyncTokenLast4 String?
+  stepSyncLastSyncedAt DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  days               Day[]
+  meals              Meal[]
+  savedMeals         SavedMeal[]
 
   @@index([createdAt])
 }
@@ -35,6 +40,8 @@ model Day {
   totalNaturalSugar Float    @default(0)
   totalSalt         Float    @default(0)
   totalSteps        Int      @default(0)
+  stepsSource       String?
+  stepsSyncedAt     DateTime?
   totalAlcohol      Float    @default(0)
   totalOmega3       Float    @default(0)
   createdAt         DateTime @default(now())

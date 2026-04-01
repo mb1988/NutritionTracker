@@ -2,6 +2,9 @@ import { type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 
+export const STEP_SOURCES = ["manual", "ios-shortcuts", "android-health-connect"] as const;
+export type StepSource = typeof STEP_SOURCES[number];
+
 // ── Types ─────────────────────────────────────────────────────
 
 /** Prisma transaction client — the `tx` argument inside $transaction callbacks. */
@@ -87,12 +90,20 @@ export async function getDayByDate(userId: string, date: string) {
 }
 
 /** Updates (or creates) the steps count for a day. */
-export async function updateDaySteps(userId: string, date: string, steps: number) {
+export async function updateDaySteps(
+  userId: string,
+  date: string,
+  steps: number,
+  options: { source?: StepSource; syncedAt?: Date | null } = {},
+) {
   validateDate(date);
+  const source = options.source ?? "manual";
+  const syncedAt = source === "manual" ? null : options.syncedAt ?? new Date();
+
   return prisma.day.upsert({
     where:  { userId_date: { userId, date } },
-    update: { totalSteps: steps },
-    create: { userId, date, totalSteps: steps },
+    update: { totalSteps: steps, stepsSource: source, stepsSyncedAt: syncedAt },
+    create: { userId, date, totalSteps: steps, stepsSource: source, stepsSyncedAt: syncedAt },
     include: { meals: { orderBy: { createdAt: "asc" } } },
   });
 }
