@@ -21,7 +21,7 @@ export function DailyFoodSuggestions({ selectedDate, goals, totals, meals, saved
   const [suggestions, setSuggestions] = useState<FoodSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [hasRequested, setHasRequested] = useState(false);
   const isToday = selectedDate === localISODate();
 
   const requestBody = useMemo(() => JSON.stringify({
@@ -37,42 +37,35 @@ export function DailyFoodSuggestions({ selectedDate, goals, totals, meals, saved
       setSuggestions([]);
       setError(null);
       setLoading(false);
-      return;
+      setHasRequested(false);
     }
+  }, [isToday]);
 
-    let cancelled = false;
+  async function loadSuggestions() {
+    setHasRequested(true);
     setLoading(true);
     setError(null);
 
-    fetch("/api/food-suggestions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody,
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          throw new Error(body?.error ?? `Request failed (${res.status})`);
-        }
-        return res.json() as Promise<FoodSuggestionResponse>;
-      })
-      .then((data) => {
-        if (!cancelled) {
-          setSuggestions(data.suggestions);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not load meal ideas right now.");
-          setLoading(false);
-        }
+    try {
+      const res = await fetch("/api/food-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: requestBody,
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [isToday, requestBody, refreshTick]);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? `Request failed (${res.status})`);
+      }
+
+      const data = await res.json() as FoodSuggestionResponse;
+      setSuggestions(data.suggestions);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load meal ideas right now.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   if (!isToday) {
     return null;
@@ -92,15 +85,20 @@ export function DailyFoodSuggestions({ selectedDate, goals, totals, meals, saved
               ? "You are already at or over some caps, so these are lighter ideas that still help the day nutritionally."
               : "Based on today’s meals, your saved templates, and a few new ideas that should still fit your targets."}
           </p>
+          {hasRequested && !loading && (
+            <p style={{ marginTop: 6, fontSize: "0.75rem", color: "var(--md-on-surface-variant)", lineHeight: 1.45 }}>
+              These ideas are based on the moment you asked. Refresh if you log more food or change goals.
+            </p>
+          )}
         </div>
         <button
           type="button"
           className="btn-ghost btn-sm"
-          onClick={() => setRefreshTick((prev) => prev + 1)}
+          onClick={() => void loadSuggestions()}
           disabled={loading}
           style={{ alignSelf: "flex-start", whiteSpace: "nowrap" }}
         >
-          {loading ? "Refreshing…" : "Refresh ideas"}
+          {loading ? (hasRequested ? "Refreshing…" : "Getting ideas…") : (hasRequested ? "Refresh ideas" : "Get ideas")}
         </button>
       </div>
 
@@ -111,7 +109,13 @@ export function DailyFoodSuggestions({ selectedDate, goals, totals, meals, saved
         </div>
       )}
 
-      {loading ? (
+      {!hasRequested && !loading ? (
+        <div className="card-inset" style={{ padding: "var(--space-4)", background: "rgba(255,255,255,0.02)" }}>
+          <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--md-on-surface-variant)", lineHeight: 1.5 }}>
+            Tap <strong>Get ideas</strong> if you want food suggestions for the rest of today.
+          </p>
+        </div>
+      ) : loading ? (
         <div style={{ display: "grid", gap: "var(--space-3)" }}>
           {[0, 1, 2].map((index) => (
             <div
