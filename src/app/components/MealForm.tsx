@@ -77,6 +77,17 @@ export function MealForm({
     }
   }, [isEditing]);
 
+  function resetComposerState(nextValues: MealFormValues = EMPTY_FORM_VALUES) {
+    setValues(nextValues);
+    setError(null);
+    setSaved(false);
+    setAiPrompt("");
+    setProductLookup("");
+    setLookupAmount("");
+    setAssistMessage(null);
+    setScannerOpen(false);
+  }
+
   function applyAutofill(data: MealFormValues, message: string) {
     setValues({
       name:         data.name         ?? "",
@@ -125,8 +136,7 @@ export function MealForm({
   function loadSavedMeal(meal: SavedMeal) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, ...vals } = meal;
-    setValues(vals);
-    setError(null);
+    resetComposerState(vals);
   }
 
   async function handleAiEstimate() {
@@ -203,7 +213,10 @@ export function MealForm({
     if (anyNeg) { setError("Macro values cannot be negative."); return; }
     setError(null);
     onSubmit(values);
-    if (!isEditing) setValues(EMPTY_FORM_VALUES);
+    if (!isEditing) {
+      resetComposerState();
+      return;
+    }
     setSaved(false);
   }
 
@@ -212,6 +225,11 @@ export function MealForm({
     onSaveTemplate?.(values);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  }
+
+  function handleClearForm() {
+    resetComposerState();
+    onCancel?.();
   }
 
   return (
@@ -368,6 +386,12 @@ export function MealForm({
                     placeholder="Paste barcode or type product name"
                     value={productLookup}
                     onChange={(e) => setProductLookup(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void handleProductLookup();
+                      }
+                    }}
                     disabled={aiLoading}
                     style={{
                       flex: 1,
@@ -389,6 +413,12 @@ export function MealForm({
                     placeholder="g/ml"
                     value={lookupAmount}
                     onChange={(e) => setLookupAmount(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void handleProductLookup();
+                      }
+                    }}
                     disabled={aiLoading}
                     style={{
                       width: 92,
@@ -540,8 +570,8 @@ export function MealForm({
                 <button type="submit" className="btn-primary">
                   {isEditing ? "Save changes" : "Add meal"}
                 </button>
-                {onCancel && !isEditing && (
-                  <button type="button" className="btn-ghost" onClick={onCancel}>Cancel</button>
+                {!isEditing && (
+                  <button type="button" className="btn-ghost" onClick={handleClearForm}>Clear form</button>
                 )}
               </div>
               {onSaveTemplate && (

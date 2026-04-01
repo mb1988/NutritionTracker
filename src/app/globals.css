@@ -367,6 +367,10 @@ hr {
   display: block;
 }
 
+.barcode-scanner__video--hidden {
+  opacity: 0;
+}
+
 .barcode-scanner__placeholder {
   display: flex;
   flex-direction: column;
@@ -376,6 +380,12 @@ hr {
   color: var(--md-on-surface-variant);
   text-align: center;
   padding: var(--space-4);
+}
+
+.barcode-scanner__placeholder--overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 6, 5, 0.92);
 }
 
 .barcode-scanner__placeholder p {

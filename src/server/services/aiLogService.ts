@@ -105,7 +105,8 @@ export async function estimateNutrition(inputOrDescription: AiLogRequest | strin
       return finalizeNutrition(buildOpenFoodFactsFallback(input.barcode, offMatch));
     }
     case "productSearch": {
-      const offMatch = await lookupProductBySearch(input.query, input.query, input.amount);
+      const cleanedQuery = buildSearchQuery(input.query) || input.query.trim();
+      const offMatch = await lookupProductBySearch(input.query, cleanedQuery, input.amount);
       if (!offMatch) {
         throw new AppError("No packaged-food match found. Try a barcode or describe the meal instead.", 404);
       }
@@ -231,7 +232,7 @@ async function lookupProductBySearch(
   }
 
   const best = rankBestProductMatch(products, description, query);
-  if (!best || best.score < 0.72) {
+  if (!best || !isConfidentProductMatch(best)) {
     if (throwWhenMissing) {
       throw new AppError("Could not find a confident packaged-food match. Try a barcode or describe the meal instead.", 404);
     }
@@ -294,7 +295,7 @@ function rankBestProductMatch(products: OpenFoodFactsProduct[], description: str
   const queryTokens = tokenise(query);
   const exactNormalizedDescription = normalizeText(description);
 
-  let best: { product: OpenFoodFactsProduct; score: number } | null = null;
+  let best: { product: OpenFoodFactsProduct; score: number; tokenCoverage: number; hasCoreNutrition: boolean } | null = null;
 
   for (const product of products) {
     const label = getProductDisplayName(product);
@@ -304,16 +305,25 @@ function rankBestProductMatch(products: OpenFoodFactsProduct[], description: str
     const tokensMatched = queryTokens.filter((token) => haystack.includes(token)).length;
     const tokenCoverage = queryTokens.length ? tokensMatched / queryTokens.length : 0;
     const exactBoost = haystack.includes(normalizedQuery) || haystack.includes(exactNormalizedDescription) ? 0.2 : 0;
-    const nutrientBoost = hasCoreNutrition(product) ? 0.15 : 0;
+    const productHasCoreNutrition = hasCoreNutrition(product);
+    const nutrientBoost = productHasCoreNutrition ? 0.15 : 0;
     const brandBoost = product.brands && normalizeText(description).includes(normalizeText(product.brands)) ? 0.1 : 0;
     const score = tokenCoverage + exactBoost + nutrientBoost + brandBoost;
 
     if (!best || score > best.score) {
-      best = { product, score };
+      best = { product, score, tokenCoverage, hasCoreNutrition: productHasCoreNutrition };
     }
   }
 
   return best;
+}
+
+function isConfidentProductMatch(match: { score: number; tokenCoverage: number; hasCoreNutrition: boolean }): boolean {
+  if (match.score >= 0.58) {
+    return true;
+  }
+
+  return match.hasCoreNutrition && match.tokenCoverage >= 0.5 && match.score >= 0.45;
 }
 
 function mapProductToNutrition(product: OpenFoodFactsProduct, amount: number) {

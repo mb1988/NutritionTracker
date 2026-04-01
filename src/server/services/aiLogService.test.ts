@@ -270,4 +270,50 @@ describe("estimateNutrition", () => {
     });
     expect(createCompletionMock).not.toHaveBeenCalled();
   });
+
+  it("normalizes manual product searches and accepts decent packaged-food matches", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        products: [
+          {
+            product_name: "Coca Cola Zero Sugar",
+            brands: "Coca-Cola",
+            nutriments: {
+              "energy-kcal_100g": 1,
+              "proteins_100g": 0,
+              "carbohydrates_100g": 0,
+              "fat_100g": 0,
+              "saturated-fat_100g": 0,
+              "fiber_100g": 0,
+              "sugars_100g": 0,
+              "salt_100g": 0.02,
+            },
+            serving_quantity: 330,
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await estimateNutrition({ mode: "productSearch", query: "Coke Zero 330ml bottle", amount: 330, modelTier: "accurate" });
+
+    expect(String(fetchMock.mock.calls[0]?.[0] ?? "")).toContain("search_terms=coke+zero");
+    expect(result).toEqual({
+      name: "Coca Cola Zero Sugar",
+      category: "Other",
+      calories: 3.3,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      satFat: 0,
+      fibre: 0,
+      addedSugar: 0,
+      naturalSugar: 0,
+      salt: 0.1,
+      alcohol: 0,
+      omega3: 0,
+    });
+    expect(createCompletionMock).not.toHaveBeenCalled();
+  });
 });
