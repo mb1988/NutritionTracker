@@ -377,7 +377,7 @@ function PageSkeleton() {
 }
 
 // ── Main Page ─────────────────────────────────────────────────
-type Tab = "today" | "history";
+type Tab = "today" | "trend" | "history" | "connect-step";
 
 export default function HomePage() {
   const { data: session, status: sessionStatus } = useSession();
@@ -573,22 +573,32 @@ export default function HomePage() {
 
       {/* Tab bar */}
       <div className="tab-bar">
-        {(["today", "history"] as Tab[]).map((t) => (
+        {(["today", "trend", "history", "connect-step"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => {
               if (t === "today") {
                 navigateToToday();
-              } else {
+              } else if (t === "history") {
                 setTab("history");
                 setHistoryDate(null);
+                setEditingMeal(null);
+                window.scrollTo({ top: 0 });
+              } else {
+                setTab(t);
                 setEditingMeal(null);
                 window.scrollTo({ top: 0 });
               }
             }}
             className={tab === t ? "active" : ""}
           >
-            {t === "today" ? "Today" : `History${allDays.length > 0 ? ` (${allDays.length})` : ""}`}
+            {t === "today"
+              ? "Today"
+              : t === "trend"
+                ? "Trend"
+                : t === "history"
+                  ? `History${allDays.length > 0 ? ` (${allDays.length})` : ""}`
+                  : "Connect Step"}
           </button>
         ))}
       </div>
@@ -612,10 +622,6 @@ export default function HomePage() {
             onStepsSave={(steps) => updateSteps(selectedDate, steps)}
           />
 
-          {Boolean(session?.user) && (
-            <StepSyncPanel enabled onRefreshData={refreshAll} />
-          )}
-
           <DayTotals
             totals={totals}
             goals={goals}
@@ -624,36 +630,6 @@ export default function HomePage() {
             onGoalsSave={updateGoals}
             meals={(selectedDay?.meals ?? []).map(({ id: _id, createdAt: _createdAt, ...meal }) => meal)}
             savedMeals={savedMeals.map(({ id: _id, ...meal }) => meal)}
-          />
-
-          <div className="stack" style={{ gap: "var(--space-3)" }}>
-            <div className="section-label" style={{ marginBottom: 0 }}>
-              Trend Analysis
-            </div>
-            <TimePeriodSelector selected={timePeriod} onSelect={setTimePeriod} />
-            <MetricSelector
-              allDays={allDays}
-              goals={goals}
-              selectedMetric={selectedMetric}
-              timePeriod={timePeriod}
-              onSelect={setSelectedMetric}
-            />
-          </div>
-
-          <WeeklyChart
-            allDays={allDays}
-            selectedDate={selectedDate}
-            goals={goals}
-            metric={selectedMetric}
-            timePeriod={timePeriod}
-            onSelectDate={(d) => {
-              if (d === todayISO()) {
-                setSelectedDate(d);
-                setEditingMeal(null);
-              } else {
-                navigateToHistoryDate(d);
-              }
-            }}
           />
 
           <div ref={mealFormRef} style={{ scrollMarginTop: "var(--space-6)" }}>
@@ -691,6 +667,50 @@ export default function HomePage() {
               setEditScrollRequest((prev) => prev + 1);
             }}
             onDelete={handleDelete}
+          />
+        </div>
+      )}
+
+      {/* TREND tab */}
+      {tab === "trend" && (
+        <div className="stack" style={{ gap: "var(--space-5)" }}>
+          <div className="card" style={{ padding: "var(--space-6)", display: "grid", gap: "var(--space-4)" }}>
+            <div>
+              <div className="section-label" style={{ marginBottom: "var(--space-2)" }}>
+                Trend Analysis
+              </div>
+              <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)", lineHeight: 1.55 }}>
+                Review your averages, switch between 1 week and longer periods, and tap the chart to jump into a specific day.
+              </p>
+            </div>
+
+            <TimePeriodSelector selected={timePeriod} onSelect={setTimePeriod} />
+
+            <MetricSelector
+              allDays={allDays}
+              goals={goals}
+              selectedMetric={selectedMetric}
+              timePeriod={timePeriod}
+              onSelect={setSelectedMetric}
+            />
+          </div>
+
+          <WeeklyChart
+            allDays={allDays}
+            selectedDate={selectedDate}
+            goals={goals}
+            metric={selectedMetric}
+            timePeriod={timePeriod}
+            onSelectDate={(d) => {
+              if (d === todayISO()) {
+                setSelectedDate(d);
+                setTab("today");
+                setEditingMeal(null);
+                window.scrollTo({ top: 0 });
+              } else {
+                navigateToHistoryDate(d);
+              }
+            }}
           />
         </div>
       )}
@@ -733,6 +753,53 @@ export default function HomePage() {
                 ))}
               </div>
             )}
+          </div>
+        )
+      )}
+
+      {/* CONNECT STEP tab */}
+      {tab === "connect-step" && (
+        Boolean(session?.user) ? (
+          <StepSyncPanel enabled onRefreshData={refreshAll} />
+        ) : (
+          <div className="card" style={{ padding: "var(--space-6)", display: "grid", gap: "var(--space-4)" }}>
+            <div>
+              <div className="section-label" style={{ marginBottom: "var(--space-2)" }}>
+                Connect phone steps
+              </div>
+              <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)", lineHeight: 1.55, maxWidth: 720 }}>
+                Step sync needs a signed-in account so your iPhone or Android device can send steps to the right profile.
+                In demo mode you can still log steps manually from the day picker.
+              </p>
+            </div>
+
+            <div className="card-inset" style={{ padding: "var(--space-5)", display: "grid", gap: "var(--space-3)" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--md-primary)" }}>
+                Available connections
+              </div>
+              <div style={{ display: "grid", gap: "var(--space-3)" }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>iPhone / Apple Health</div>
+                  <p style={{ fontSize: "0.8125rem", color: "var(--md-on-surface-variant)", marginTop: 4 }}>
+                    Best supported path today: Apple Shortcuts reads your Health steps and syncs them into the app.
+                  </p>
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700 }}>Android / Health Connect</div>
+                  <p style={{ fontSize: "0.8125rem", color: "var(--md-on-surface-variant)", marginTop: 4 }}>
+                    Backend support is prepared, with the full Android setup flow coming next.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                onClick={() => { window.location.href = "/login"; }}
+                style={{ width: "fit-content" }}
+              >
+                Sign in to connect steps
+              </button>
+            </div>
           </div>
         )
       )}
