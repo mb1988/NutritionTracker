@@ -131,18 +131,18 @@ export function MealForm({
 
   async function handleAiEstimate() {
     const text = aiPrompt.trim();
-    if (!text) { setError("Describe what you ate so AI can estimate nutrition."); return; }
+    if (!text) { setError("Tell the assistant what you ate so it can fill the form."); return; }
     setAiLoading(true);
     setError(null);
     setAssistMessage(null);
     try {
       const data = await requestAutofill({ mode: "describe", description: text, modelTier });
       applyAutofill(data, modelTier === "accurate"
-        ? "Autofilled with gpt-4o."
-        : "Autofilled with lower-cost AI assistance.");
+        ? "Filled from your meal description."
+        : "Filled from your meal description using budget mode.");
       setAiPrompt("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI estimation failed.");
+      setError(err instanceof Error ? err.message : "Could not fill the form from that description.");
     } finally {
       setAiLoading(false);
     }
@@ -151,7 +151,7 @@ export function MealForm({
   async function handleProductLookup(rawOverride?: string) {
     const raw = (rawOverride ?? productLookup).trim();
     if (!raw) {
-      setError("Enter a barcode or packaged-food name to look it up.");
+      setError("Enter a barcode or product name to look it up.");
       return;
     }
 
@@ -174,13 +174,13 @@ export function MealForm({
       applyAutofill(
         data,
         isBarcode
-          ? "Autofilled from packaged-food barcode data."
-          : "Autofilled from packaged-food database search.",
+          ? "Filled from barcode lookup."
+          : "Filled from product search.",
       );
       setProductLookup("");
       setScannerOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Product lookup failed.");
+      setError(err instanceof Error ? err.message : "Could not find nutrition for that product.");
     } finally {
       setAiLoading(false);
     }
@@ -283,12 +283,12 @@ export function MealForm({
                   fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase",
                   letterSpacing: "0.06em", color: "var(--md-primary)",
                 }}>
-                  AI + Food DB
+                  Quick fill
                 </span>
               </div>
               <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBottom: "var(--space-3)", flexWrap: "wrap" }}>
                 <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--md-on-surface-variant)" }} htmlFor="meal-model-tier">
-                  Accuracy mode
+                  Assistant mode
                 </label>
                 <select
                   id="meal-model-tier"
@@ -305,8 +305,8 @@ export function MealForm({
                     fontWeight: 600,
                   }}
                 >
-                  <option value="accurate">Default · gpt-4o</option>
-                  <option value="balanced">Lower cost · gpt-4o-mini</option>
+                  <option value="accurate">Best accuracy · GPT-4o</option>
+                  <option value="balanced">Lower cost · GPT-4o mini</option>
                 </select>
               </div>
               <div style={{ display: "flex", gap: "var(--space-2)" }}>
@@ -343,14 +343,14 @@ export function MealForm({
                     flexShrink: 0,
                   }}
                 >
-                  {aiLoading ? "Estimating…" : "✨ Autofill"}
+                  {aiLoading ? "Filling…" : "✨ Fill from description"}
                 </button>
               </div>
               <p style={{
                 fontSize: "0.6875rem", color: "var(--md-on-surface-variant)",
                 marginTop: "var(--space-2)", lineHeight: 1.4,
               }}>
-                Describe a meal or packaged food with quantities — the app checks food database matches first, then uses AI to fill the rest.
+                Describe what you ate and include rough amounts. The app checks food database matches first, then fills any gaps with AI.
               </p>
               <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                 <div style={{
@@ -359,7 +359,7 @@ export function MealForm({
                 }}>
                   <span style={{ fontSize: "1rem" }}>🏷️</span>
                   <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--md-on-surface-variant)" }}>
-                    Packaged food lookup
+                    Product lookup
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
@@ -410,7 +410,7 @@ export function MealForm({
                     className="btn-tonal btn-sm"
                     style={{ borderRadius: "var(--radius-full)", padding: "10px var(--space-5)", whiteSpace: "nowrap" }}
                   >
-                    {aiLoading ? "Looking up…" : "Lookup"}
+                      {aiLoading ? "Looking up…" : "Find product"}
                   </button>
                   <button
                     type="button"
@@ -419,7 +419,7 @@ export function MealForm({
                     className="btn-ghost btn-sm"
                     style={{ borderRadius: "var(--radius-full)", padding: "10px var(--space-5)", whiteSpace: "nowrap" }}
                   >
-                    {scannerOpen ? "Hide scanner" : "📷 Scan barcode"}
+                    {scannerOpen ? "Hide scanner" : "📷 Scan with camera"}
                   </button>
                 </div>
                 <p style={{
@@ -428,7 +428,7 @@ export function MealForm({
                   marginTop: "var(--space-2)",
                   lineHeight: 1.4,
                 }}>
-                  Leave g/ml blank to use the product&apos;s serving size when available, otherwise 100g/100ml.
+                  Enter grams or ml eaten. Leave it blank to use the serving size when available, otherwise 100g/100ml.
                 </p>
                 {scannerOpen && (
                   <div style={{ marginTop: "var(--space-3)" }}>
