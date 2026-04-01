@@ -2,8 +2,10 @@
 
 import { useState, useEffect, type FormEvent } from "react";
 import { type MealFormValues, type SavedMeal, EMPTY_FORM_VALUES } from "@/app/types";
+import { BarcodeScanner } from "@/app/components/BarcodeScanner";
 import { MacroInput }       from "@/app/components/MacroInput";
 import { SavedMealPicker }  from "@/app/components/SavedMealPicker";
+import { normalizeBarcodeValue } from "@/app/components/barcodeScannerSupport";
 
 export const MEAL_CATEGORIES = ["Breakfast", "Lunch", "Dinner", "Snack", "Other"] as const;
 export type MealCategory = typeof MEAL_CATEGORIES[number];
@@ -26,6 +28,7 @@ type Props = {
 };
 
 type NumericField = Exclude<keyof MealFormValues, "name" | "category">;
+type AssistModelTier = "balanced" | "accurate";
 
 const ALL_FIELDS: { key: NumericField; label: string }[] = [
   { key: "calories",     label: "Calories (kcal)" },
@@ -53,14 +56,60 @@ export function MealForm({
   // AI estimation state
   const [aiPrompt,  setAiPrompt]  = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [productLookup, setProductLookup] = useState("");
+  const [lookupAmount, setLookupAmount] = useState("");
+  const [modelTier, setModelTier] = useState<AssistModelTier>("accurate");
+  const [assistMessage, setAssistMessage] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     setValues(initialValues ?? EMPTY_FORM_VALUES);
     setError(null);
     setSaved(false);
+    setAssistMessage(null);
     if (initialValues) setCollapsed(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialValues]);
+
+  useEffect(() => {
+    if (isEditing) {
+      setScannerOpen(false);
+    }
+  }, [isEditing]);
+
+  function applyAutofill(data: MealFormValues, message: string) {
+    setValues({
+      name:         data.name         ?? "",
+      category:     data.category     ?? null,
+      calories:     data.calories     ?? 0,
+      protein:      data.protein      ?? 0,
+      carbs:        data.carbs        ?? 0,
+      fat:          data.fat          ?? 0,
+      satFat:       data.satFat       ?? 0,
+      fibre:        data.fibre        ?? 0,
+      addedSugar:   data.addedSugar   ?? 0,
+      naturalSugar: data.naturalSugar ?? 0,
+      salt:         data.salt         ?? 0,
+      alcohol:      data.alcohol      ?? 0,
+      omega3:       data.omega3       ?? 0,
+    });
+    setAssistMessage(message);
+  }
+
+  async function requestAutofill(payload: Record<string, unknown>) {
+    const res = await fetch("/api/ai-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error ?? `Request failed (${res.status})`);
+    }
+
+    return await res.json() as MealFormValues;
+  }
 
   function setField<K extends keyof MealFormValues>(key: K, raw: string) {
     if (key === "name") {
@@ -85,38 +134,61 @@ export function MealForm({
     if (!text) { setError("Describe what you ate so AI can estimate nutrition."); return; }
     setAiLoading(true);
     setError(null);
+    setAssistMessage(null);
     try {
-      const res = await fetch("/api/ai-log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: text }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error ?? `Request failed (${res.status})`);
-      }
-      const data = await res.json();
-      setValues({
-        name:         data.name         ?? "",
-        category:     data.category     ?? null,
-        calories:     data.calories     ?? 0,
-        protein:      data.protein      ?? 0,
-        carbs:        data.carbs        ?? 0,
-        fat:          data.fat          ?? 0,
-        satFat:       data.satFat       ?? 0,
-        fibre:        data.fibre        ?? 0,
-        addedSugar:   data.addedSugar   ?? 0,
-        naturalSugar: data.naturalSugar ?? 0,
-        salt:         data.salt         ?? 0,
-        alcohol:      data.alcohol      ?? 0,
-        omega3:       data.omega3       ?? 0,
-      });
+      const data = await requestAutofill({ mode: "describe", description: text, modelTier });
+      applyAutofill(data, modelTier === "accurate"
+        ? "Autofilled with gpt-4o."
+        : "Autofilled with lower-cost AI assistance.");
       setAiPrompt("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI estimation failed.");
     } finally {
       setAiLoading(false);
     }
+  }
+
+  async function handleProductLookup(rawOverride?: string) {
+    const raw = (rawOverride ?? productLookup).trim();
+    if (!raw) {
+      setError("Enter a barcode or packaged-food name to look it up.");
+      return;
+    }
+
+    const amount = lookupAmount.trim() ? Number(lookupAmount) : undefined;
+    if (lookupAmount.trim() && (!Number.isFinite(amount) || Number(amount) <= 0)) {
+      setError("Amount must be a positive number in g/ml.");
+      return;
+    }
+
+    const barcode = normalizeBarcodeValue(raw);
+    const isBarcode = /^\d{8,14}$/.test(barcode);
+
+    setAiLoading(true);
+    setError(null);
+    setAssistMessage(null);
+    try {
+      const data = await requestAutofill(isBarcode
+        ? { mode: "barcode", barcode, amount, modelTier }
+        : { mode: "productSearch", query: raw, amount, modelTier });
+      applyAutofill(
+        data,
+        isBarcode
+          ? "Autofilled from packaged-food barcode data."
+          : "Autofilled from packaged-food database search.",
+      );
+      setProductLookup("");
+      setScannerOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Product lookup failed.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function handleScannerDetected(barcode: string) {
+    setProductLookup(barcode);
+    void handleProductLookup(barcode);
   }
 
   function handleSubmit(e: FormEvent) {
@@ -211,8 +283,31 @@ export function MealForm({
                   fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase",
                   letterSpacing: "0.06em", color: "var(--md-primary)",
                 }}>
-                  AI Estimate
+                  AI + Food DB
                 </span>
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBottom: "var(--space-3)", flexWrap: "wrap" }}>
+                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--md-on-surface-variant)" }} htmlFor="meal-model-tier">
+                  Accuracy mode
+                </label>
+                <select
+                  id="meal-model-tier"
+                  value={modelTier}
+                  onChange={(e) => setModelTier(e.target.value as AssistModelTier)}
+                  disabled={aiLoading}
+                  style={{
+                    borderRadius: "var(--radius-full)",
+                    border: "1px solid var(--md-outline-variant)",
+                    background: "var(--md-surface-container)",
+                    color: "var(--md-on-surface)",
+                    padding: "8px 12px",
+                    fontSize: "0.8125rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  <option value="accurate">Default · gpt-4o</option>
+                  <option value="balanced">Lower cost · gpt-4o-mini</option>
+                </select>
               </div>
               <div style={{ display: "flex", gap: "var(--space-2)" }}>
                 <input
@@ -248,15 +343,115 @@ export function MealForm({
                     flexShrink: 0,
                   }}
                 >
-                  {aiLoading ? "Estimating…" : "✨ Estimate"}
+                  {aiLoading ? "Estimating…" : "✨ Autofill"}
                 </button>
               </div>
               <p style={{
                 fontSize: "0.6875rem", color: "var(--md-on-surface-variant)",
                 marginTop: "var(--space-2)", lineHeight: 1.4,
               }}>
-                Describe your meal with quantities — AI fills all nutrition fields for you.
+                Describe a meal or packaged food with quantities — the app checks food database matches first, then uses AI to fill the rest.
               </p>
+              <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "var(--space-2)",
+                  marginBottom: "var(--space-3)",
+                }}>
+                  <span style={{ fontSize: "1rem" }}>🏷️</span>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--md-on-surface-variant)" }}>
+                    Packaged food lookup
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                  <input
+                    type="text"
+                    placeholder="Paste barcode or type product name"
+                    value={productLookup}
+                    onChange={(e) => setProductLookup(e.target.value)}
+                    disabled={aiLoading}
+                    style={{
+                      flex: 1,
+                      minWidth: 220,
+                      fontSize: "0.9375rem",
+                      fontWeight: 500,
+                      background: "var(--md-surface-container)",
+                      border: "1px solid var(--md-outline-variant)",
+                      borderRadius: "var(--radius-full)",
+                      padding: "10px var(--space-4)",
+                      color: "var(--md-on-surface)",
+                      outline: "none",
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    step="1"
+                    placeholder="g/ml"
+                    value={lookupAmount}
+                    onChange={(e) => setLookupAmount(e.target.value)}
+                    disabled={aiLoading}
+                    style={{
+                      width: 92,
+                      fontSize: "0.9375rem",
+                      fontWeight: 600,
+                      background: "var(--md-surface-container)",
+                      border: "1px solid var(--md-outline-variant)",
+                      borderRadius: "var(--radius-full)",
+                      padding: "10px 12px",
+                      color: "var(--md-on-surface)",
+                      outline: "none",
+                      textAlign: "center",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleProductLookup()}
+                    disabled={aiLoading || !productLookup.trim()}
+                    className="btn-tonal btn-sm"
+                    style={{ borderRadius: "var(--radius-full)", padding: "10px var(--space-5)", whiteSpace: "nowrap" }}
+                  >
+                    {aiLoading ? "Looking up…" : "Lookup"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScannerOpen((open) => !open)}
+                    disabled={aiLoading}
+                    className="btn-ghost btn-sm"
+                    style={{ borderRadius: "var(--radius-full)", padding: "10px var(--space-5)", whiteSpace: "nowrap" }}
+                  >
+                    {scannerOpen ? "Hide scanner" : "📷 Scan barcode"}
+                  </button>
+                </div>
+                <p style={{
+                  fontSize: "0.6875rem",
+                  color: "var(--md-on-surface-variant)",
+                  marginTop: "var(--space-2)",
+                  lineHeight: 1.4,
+                }}>
+                  Leave g/ml blank to use the product&apos;s serving size when available, otherwise 100g/100ml.
+                </p>
+                {scannerOpen && (
+                  <div style={{ marginTop: "var(--space-3)" }}>
+                    <BarcodeScanner
+                      onDetected={handleScannerDetected}
+                      onClose={() => setScannerOpen(false)}
+                    />
+                  </div>
+                )}
+              </div>
+              {assistMessage && (
+                <div style={{
+                  marginTop: "var(--space-3)",
+                  padding: "10px 12px",
+                  borderRadius: "var(--radius-md)",
+                  background: "rgba(104, 185, 132, 0.12)",
+                  color: "var(--md-primary)",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                }}>
+                  ✓ {assistMessage}
+                </div>
+              )}
             </div>
           )}
 
