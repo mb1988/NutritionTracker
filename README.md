@@ -17,6 +17,7 @@ Try it instantly — no sign-up required. Demo mode provides full functionality 
 - Per-meal **health-coloured badges** (green / orange / red) based on NHS reference intake guidelines
 - Edit and delete individual meals inline
 - Track daily steps
+- Optional phone step sync for signed-in users: iPhone via Apple Health → Shortcuts → secure webhook
 - Collapsible "Log meal" form and "Meals logged" list for a clean interface
 - Navigate between days with arrow buttons or a calendar date picker
 
@@ -49,6 +50,13 @@ Try it instantly — no sign-up required. Demo mode provides full functionality 
 - Full feature parity: log meals, edit goals, browse history, view trends
 - One-click data reset to restore sample data
 - Ideal for showcasing the app on a portfolio or résumé
+
+### Step Sync
+- iPhone-first step sync flow for signed-in users
+- The app generates a secure token and webhook URL inside the UI
+- An Apple Shortcut can read today’s step count from Health and POST it into the app
+- Synced days store source metadata and last synced timestamp
+- Android provider support is scaffolded server-side and marked as coming soon in the UI
 
 ### Auth & Access Control
 - GitHub OAuth sign-in via NextAuth
@@ -168,6 +176,10 @@ All routes require an active session or a valid demo cookie. Data is scoped to t
 | `POST` | `/api/saved-meals/use` | Add a saved meal to a specific day |
 | `POST` | `/api/demo/reset` | Reset demo user data to sample defaults |
 | `POST` | `/api/ai-log` | Hybrid nutrition estimate: packaged-food lookup via Open Food Facts first, then AI completion/fallback (returns JSON, no DB write) |
+| `GET` | `/api/step-sync` | Read current signed-in user phone step sync config |
+| `POST` | `/api/step-sync` | Enable/rotate a phone step sync token for a provider |
+| `DELETE` | `/api/step-sync` | Disable phone step sync for the signed-in user |
+| `POST` | `/api/steps/sync` | Public token-authenticated webhook for iPhone/Android step ingestion |
 
 `/api/ai-log` supports three request modes:
 
@@ -181,6 +193,8 @@ For model choice, the UI exposes:
 - `Lower cost` → `gpt-4o-mini`
 
 Camera scanning uses the browser's native camera + `BarcodeDetector` support, so it works best on modern Chromium-based mobile browsers over HTTPS or localhost. If unsupported, users can still paste the barcode manually.
+
+Phone step sync is different: browsers cannot read Apple Health or Health Connect directly, so the app uses a token-authenticated webhook flow instead. The current polished setup is iPhone-first using Apple Shortcuts.
 
 ---
 

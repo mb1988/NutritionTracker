@@ -36,6 +36,8 @@ export type ApiDay = {
   totalNaturalSugar: number;
   totalSalt: number;
   totalSteps: number;
+  stepsSource?: string | null;
+  stepsSyncedAt?: string | null;
   totalAlcohol: number;
   totalOmega3: number;
   meals: ApiMeal[];
