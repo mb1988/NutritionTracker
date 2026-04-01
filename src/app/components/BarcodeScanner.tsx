@@ -133,7 +133,7 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
     setStatus("ready");
     setMessage(
       support.preferStillImageCapture
-        ? "iPhone mode is on. If live scan misses, tap “Take photo instead”."
+        ? "Live scan is on, but on iPhone the photo option is usually faster if the code does not lock quickly."
         : "Compatibility scan is ready. Hold the barcode inside the frame.",
     );
 
@@ -172,26 +172,17 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
     setPhotoLoading(true);
 
     try {
-      const { BrowserMultiFormatReader } = await import("@zxing/browser");
-      const objectUrl = URL.createObjectURL(file);
-      try {
-        const image = await loadImageFromObjectUrl(objectUrl);
-        const reader = new BrowserMultiFormatReader();
-        const result = await reader.decodeFromImageElement(image);
-        const rawValue = result?.getText ? normalizeBarcodeValue(result.getText()) : "";
+      const rawValue = await decodeBarcodeFromPhoto(file);
 
-        if (!rawValue) {
-          throw new Error("No barcode was found in that photo.");
-        }
-
-        stopScanner();
-        onDetected(rawValue);
-      } finally {
-        URL.revokeObjectURL(objectUrl);
+      if (!rawValue) {
+        throw new Error("No barcode was found in that photo.");
       }
+
+      stopScanner();
+      onDetected(rawValue);
     } catch (error) {
       setMessage(error instanceof Error
-        ? `${error.message} Try another photo or type the barcode manually.`
+        ? `${error.message} Try moving closer, filling the frame, or typing the barcode manually.`
         : "Could not read that photo. Try another shot or type the barcode manually.");
     } finally {
       setPhotoLoading(false);
@@ -228,10 +219,15 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
       </div>
 
       <div className="barcode-scanner__viewport">
-        {status === "ready" ? (
-          <video ref={videoRef} className="barcode-scanner__video" autoPlay muted playsInline />
-        ) : (
-          <div className="barcode-scanner__placeholder">
+        <video
+          ref={videoRef}
+          className={`barcode-scanner__video${status === "ready" ? "" : " barcode-scanner__video--hidden"}`}
+          autoPlay
+          muted
+          playsInline
+        />
+        {status !== "ready" && (
+          <div className="barcode-scanner__placeholder barcode-scanner__placeholder--overlay">
             <span style={{ fontSize: "1.5rem" }}>{status === "unsupported" ? "📵" : status === "error" ? "⚠️" : "📷"}</span>
             <p>{message}</p>
           </div>
@@ -250,7 +246,7 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
           onClick={() => fileInputRef.current?.click()}
           disabled={photoLoading}
         >
-          {photoLoading ? "Reading photo…" : support.preferStillImageCapture || support.mode === "unsupported" ? "📸 Take photo instead" : "📸 Scan from photo"}
+          {photoLoading ? "Reading photo…" : support.preferStillImageCapture || support.mode === "unsupported" ? "📸 Take photo instead" : "📸 Use photo / upload"}
         </button>
         <span className="barcode-scanner__mode-badge">
           {support.mode === "native" ? "Live scan" : support.mode === "fallback" ? "Compatibility mode" : "Photo fallback"}
@@ -267,7 +263,7 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
       />
 
       <p className="barcode-scanner__hint">
-        On iPhone browsers like Brave, Chrome, and Safari, the photo option is often the most reliable fallback.
+        On iPhone browsers like Brave, Chrome, and Safari, start with a clear close-up photo if live scan does not lock within a second or two.
       </p>
     </div>
   );
@@ -290,9 +286,94 @@ function describeScannerError(error: unknown): string {
 function loadImageFromObjectUrl(objectUrl: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
+    image.decoding = "async";
     image.onload = () => resolve(image);
     image.onerror = () => reject(new Error("The selected photo could not be opened."));
     image.src = objectUrl;
+  });
+}
+
+async function decodeBarcodeFromPhoto(file: File): Promise<string | null> {
+  const { BrowserMultiFormatReader } = await import("@zxing/browser");
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    const sourceImage = await loadImageFromObjectUrl(objectUrl);
+    const variants = await buildDecodeVariants(sourceImage);
+
+    for (const variant of variants) {
+      try {
+        const reader = new BrowserMultiFormatReader();
+        const result = await reader.decodeFromImageElement(variant);
+        const rawValue = result?.getText ? normalizeBarcodeValue(result.getText()) : "";
+        if (rawValue) {
+          return rawValue;
+        }
+      } catch {
+        // keep trying other image variants
+      }
+    }
+
+    return null;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function buildDecodeVariants(sourceImage: HTMLImageElement): Promise<HTMLImageElement[]> {
+  const variants: HTMLImageElement[] = [sourceImage];
+  const maxDimension = Math.max(sourceImage.naturalWidth || sourceImage.width, sourceImage.naturalHeight || sourceImage.height, 1);
+  const baseScale = maxDimension > 1800 ? 1800 / maxDimension : 1;
+  const specs = [
+    { scale: baseScale, cropRatio: 1 },
+    { scale: Math.min(baseScale, 0.8), cropRatio: 0.92 },
+    { scale: Math.min(baseScale, 0.68), cropRatio: 0.82 },
+    { scale: Math.min(baseScale, 0.56), cropRatio: 0.7 },
+  ];
+
+  for (const spec of specs) {
+    if (spec.scale <= 0) continue;
+    const variant = await renderDecodeVariant(sourceImage, spec.scale, spec.cropRatio);
+    if (variant) {
+      variants.push(variant);
+    }
+  }
+
+  return variants;
+}
+
+async function renderDecodeVariant(sourceImage: HTMLImageElement, scale: number, cropRatio: number): Promise<HTMLImageElement | null> {
+  const sourceWidth = sourceImage.naturalWidth || sourceImage.width;
+  const sourceHeight = sourceImage.naturalHeight || sourceImage.height;
+  if (!sourceWidth || !sourceHeight) {
+    return null;
+  }
+
+  const cropWidth = Math.max(1, Math.round(sourceWidth * cropRatio));
+  const cropHeight = Math.max(1, Math.round(sourceHeight * cropRatio));
+  const sx = Math.max(0, Math.round((sourceWidth - cropWidth) / 2));
+  const sy = Math.max(0, Math.round((sourceHeight - cropHeight) / 2));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(cropWidth * scale));
+  canvas.height = Math.max(1, Math.round(cropHeight * scale));
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) {
+    return null;
+  }
+
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(sourceImage, sx, sy, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+  return await loadImageFromDataUrl(canvas.toDataURL("image/jpeg", 0.92));
+}
+
+function loadImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("The selected photo could not be processed."));
+    image.src = dataUrl;
   });
 }
 
