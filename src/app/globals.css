@@ -410,6 +410,27 @@ hr {
   box-shadow: 0 0 18px rgba(104,185,132,0.55);
 }
 
+.barcode-scanner__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.barcode-scanner__mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--md-on-surface-variant);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .barcode-scanner__hint {
   font-size: 0.75rem;
   color: var(--md-on-surface-variant);
