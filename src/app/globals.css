@@ -447,6 +447,214 @@ hr {
   line-height: 1.4;
 }
 
+/* ─── Log meal quick fill ─────────────────────────────────── */
+.quick-fill {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(104,185,132,0.06) 0%, rgba(104,185,132,0.02) 100%);
+  border: 1px solid rgba(104,185,132,0.15);
+}
+
+.quick-fill__header {
+  margin-bottom: var(--space-3);
+}
+
+.quick-fill__header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.quick-fill__sparkle {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.quick-fill__eyebrow {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--md-primary);
+}
+
+.quick-fill__summary {
+  margin-top: 2px;
+  font-size: 0.8125rem;
+  color: var(--md-on-surface-variant);
+  line-height: 1.45;
+}
+
+.quick-fill__sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.quick-fill__section {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.quick-fill__section-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.quick-fill__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.quick-fill__icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.quick-fill__title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--md-on-surface);
+}
+
+.quick-fill__meta {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--md-on-surface-variant);
+}
+
+.quick-fill__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.quick-fill__mode-label {
+  margin: 0;
+  font-size: 0.625rem;
+  color: var(--md-on-surface-variant);
+}
+
+.quick-fill__select,
+.quick-fill__input {
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--radius-full);
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  font-weight: 500;
+  padding: 10px 14px;
+}
+
+.quick-fill__select {
+  width: auto;
+  min-width: min(100%, 220px);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.quick-fill__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.quick-fill__row--lookup .quick-fill__input:first-child,
+.quick-fill__row--assistant .quick-fill__input--description {
+  flex: 1 1 240px;
+}
+
+.quick-fill__input {
+  font-size: 0.9375rem;
+  min-width: 0;
+}
+
+.quick-fill__input--amount {
+  width: 92px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.quick-fill__input--description {
+  font-size: 0.9375rem;
+}
+
+.quick-fill__action {
+  min-height: 40px;
+  padding: 10px var(--space-4);
+  flex-shrink: 0;
+}
+
+.quick-fill__hint {
+  margin-top: var(--space-2);
+  font-size: 0.6875rem;
+  color: var(--md-on-surface-variant);
+  line-height: 1.4;
+}
+
+.quick-fill__scanner {
+  margin-top: var(--space-3);
+}
+
+.quick-fill__tips {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.quick-fill__tips-toggle {
+  width: 100%;
+  justify-content: space-between;
+  padding: 0;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.quick-fill__tips-toggle:hover:not(:disabled) {
+  color: var(--md-on-surface);
+}
+
+.quick-fill__tips-caret {
+  font-size: 0.6875rem;
+  transition: transform var(--transition);
+}
+
+.quick-fill__tips-caret--open {
+  transform: rotate(180deg);
+}
+
+.quick-fill__tips-panel {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quick-fill__feedback {
+  margin-top: var(--space-3);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(104, 185, 132, 0.12);
+  color: var(--md-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 /* ─── Tabs (pill style) ───────────────────────────────────── */
 .tab-bar {
   display: flex;
@@ -989,5 +1197,46 @@ hr {
   .page-wrapper { padding: var(--space-5) var(--space-4) var(--space-12); }
   .calories-hero__value { font-size: 2.75rem; }
   h1 { font-size: 1.375rem; }
+
+  .quick-fill {
+    padding: var(--space-3);
+  }
+
+  .quick-fill__summary {
+    font-size: 0.75rem;
+  }
+
+  .quick-fill__section {
+    padding: var(--space-2) var(--space-3) var(--space-3);
+  }
+
+  .quick-fill__row {
+    align-items: stretch;
+  }
+
+  .quick-fill__select,
+  .quick-fill__input {
+    font-size: 1rem;
+  }
+
+  .quick-fill__select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .quick-fill__row--lookup .quick-fill__input:first-child,
+  .quick-fill__row--assistant .quick-fill__input--description,
+  .quick-fill__action {
+    flex: 1 1 100%;
+  }
+
+  .quick-fill__input--amount {
+    width: 100%;
+    text-align: left;
+  }
+
+  .quick-fill__action {
+    width: 100%;
+  }
 }
 
