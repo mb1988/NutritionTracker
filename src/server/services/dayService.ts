@@ -108,10 +108,16 @@ export async function updateDaySteps(
   });
 }
 
-/** Returns all days for a user, ordered newest first (no meals included). */
+/** Returns all days for a user that have at least one meal or logged steps, ordered newest first. */
 export async function getAllDays(userId: string) {
   return prisma.day.findMany({
-    where: { userId },
+    where: {
+      userId,
+      OR: [
+        { meals: { some: {} } },
+        { totalSteps: { gt: 0 } },
+      ],
+    },
     orderBy: { date: "desc" },
     include: { meals: { orderBy: { createdAt: "asc" } } },
   });

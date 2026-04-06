@@ -267,6 +267,7 @@ describe("estimateNutrition", () => {
       salt: 0.1,
       alcohol: 0,
       omega3: 0,
+      servingGrams: 330,
     });
     expect(createCompletionMock).not.toHaveBeenCalled();
   });

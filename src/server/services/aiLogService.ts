@@ -101,8 +101,8 @@ export async function estimateNutrition(inputOrDescription: AiLogRequest | strin
 
   switch (input.mode) {
     case "barcode": {
-      const offMatch = await lookupProductByBarcode(input.barcode, input.amount);
-      return finalizeNutrition(buildOpenFoodFactsFallback(input.barcode, offMatch));
+      const { match, usedAmount } = await lookupProductByBarcode(input.barcode, input.amount);
+      return { ...finalizeNutrition(buildOpenFoodFactsFallback(input.barcode, match)), servingGrams: usedAmount };
     }
     case "productSearch": {
       const cleanedQuery = buildSearchQuery(input.query) || input.query.trim();
@@ -253,7 +253,7 @@ async function lookupProductBySearch(
   return nutrition;
 }
 
-async function lookupProductByBarcode(barcode: string, amount?: number): Promise<OpenFoodFactsMatch> {
+async function lookupProductByBarcode(barcode: string, amount?: number): Promise<{ match: OpenFoodFactsMatch; usedAmount: number }> {
   const sanitized = barcode.replace(/\D/g, "");
   const url = `https://world.openfoodfacts.org/api/v2/product/${sanitized}.json?fields=${encodeURIComponent(OFF_FIELDS)}`;
   const data = await fetchOpenFoodFactsJson<OpenFoodFactsProductResponse>(url);
@@ -272,7 +272,7 @@ async function lookupProductByBarcode(barcode: string, amount?: number): Promise
     throw new AppError("That barcode was found, but its nutrition data is incomplete. Try another product or describe the meal.", 404);
   }
 
-  return nutrition;
+  return { match: nutrition, usedAmount };
 }
 
 async function fetchOpenFoodFactsJson<T>(url: string): Promise<T> {

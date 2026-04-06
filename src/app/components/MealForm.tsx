@@ -30,6 +30,33 @@ type Props = {
 type NumericField = Exclude<keyof MealFormValues, "name" | "category">;
 type AssistModelTier = "balanced" | "accurate";
 
+type BarcodeConfirm = {
+  productName: string;
+  baseData: MealFormValues;
+  servingGrams: number;
+  adjustedGrams: string;
+};
+
+function scaleNutrition(base: MealFormValues, baseGrams: number, newGrams: number): MealFormValues {
+  const r = newGrams / baseGrams;
+  const sc = (v: number) => Math.round(v * r * 10) / 10;
+  return {
+    name:         base.name,
+    category:     base.category,
+    calories:     sc(base.calories),
+    protein:      sc(base.protein),
+    carbs:        sc(base.carbs),
+    fat:          sc(base.fat),
+    satFat:       sc(base.satFat),
+    fibre:        sc(base.fibre),
+    addedSugar:   sc(base.addedSugar),
+    naturalSugar: sc(base.naturalSugar),
+    salt:         sc(base.salt),
+    alcohol:      sc(base.alcohol),
+    omega3:       sc(base.omega3),
+  };
+}
+
 const ALL_FIELDS: { key: NumericField; label: string }[] = [
   { key: "calories",     label: "Calories (kcal)" },
   { key: "protein",      label: "Protein (g)"     },
@@ -57,11 +84,11 @@ export function MealForm({
   const [aiPrompt,  setAiPrompt]  = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [productLookup, setProductLookup] = useState("");
-  const [lookupAmount, setLookupAmount] = useState("");
   const [modelTier, setModelTier] = useState<AssistModelTier>("accurate");
   const [assistMessage, setAssistMessage] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [quickFillTipsOpen, setQuickFillTipsOpen] = useState(false);
+  const [barcodeConfirm, setBarcodeConfirm] = useState<BarcodeConfirm | null>(null);
 
   useEffect(() => {
     setValues(initialValues ?? EMPTY_FORM_VALUES);
@@ -85,27 +112,28 @@ export function MealForm({
     setSaved(false);
     setAiPrompt("");
     setProductLookup("");
-    setLookupAmount("");
     setAssistMessage(null);
     setScannerOpen(false);
     setQuickFillTipsOpen(false);
+    setBarcodeConfirm(null);
   }
 
   function applyAutofill(data: MealFormValues, message: string) {
+    const r1 = (v: number | undefined) => Math.round((v ?? 0) * 10) / 10;
     setValues({
       name:         data.name         ?? "",
       category:     data.category     ?? null,
-      calories:     data.calories     ?? 0,
-      protein:      data.protein      ?? 0,
-      carbs:        data.carbs        ?? 0,
-      fat:          data.fat          ?? 0,
-      satFat:       data.satFat       ?? 0,
-      fibre:        data.fibre        ?? 0,
-      addedSugar:   data.addedSugar   ?? 0,
-      naturalSugar: data.naturalSugar ?? 0,
-      salt:         data.salt         ?? 0,
-      alcohol:      data.alcohol      ?? 0,
-      omega3:       data.omega3       ?? 0,
+      calories:     r1(data.calories),
+      protein:      r1(data.protein),
+      carbs:        r1(data.carbs),
+      fat:          r1(data.fat),
+      satFat:       r1(data.satFat),
+      fibre:        r1(data.fibre),
+      addedSugar:   r1(data.addedSugar),
+      naturalSugar: r1(data.naturalSugar),
+      salt:         r1(data.salt),
+      alcohol:      r1(data.alcohol),
+      omega3:       r1(data.omega3),
     });
     setAssistMessage(message);
   }
@@ -132,7 +160,8 @@ export function MealForm({
       setValues((prev) => ({ ...prev, category: raw === "" ? null : raw }));
     } else {
       const num = parseFloat(raw);
-      setValues((prev) => ({ ...prev, [key]: isNaN(num) ? 0 : num }));
+      const rounded = isNaN(num) ? 0 : Math.round(num * 10) / 10;
+      setValues((prev) => ({ ...prev, [key]: rounded }));
     }
   }
 
@@ -161,47 +190,36 @@ export function MealForm({
     }
   }
 
-  async function handleProductLookup(rawOverride?: string) {
-    const raw = (rawOverride ?? productLookup).trim();
-    if (!raw) {
-      setError("Enter a barcode or product name to look it up.");
+  async function handleBarcodeConfirmFlow(rawBarcode: string) {
+    const barcode = normalizeBarcodeValue(rawBarcode);
+    if (!/^\d{8,14}$/.test(barcode)) {
+      setError("Enter a valid barcode number (8–14 digits). For other foods, use Assistant mode.");
       return;
     }
-
-    const amount = lookupAmount.trim() ? Number(lookupAmount) : undefined;
-    if (lookupAmount.trim() && (!Number.isFinite(amount) || Number(amount) <= 0)) {
-      setError("Amount must be a positive number in g/ml.");
-      return;
-    }
-
-    const barcode = normalizeBarcodeValue(raw);
-    const isBarcode = /^\d{8,14}$/.test(barcode);
-
     setAiLoading(true);
     setError(null);
     setAssistMessage(null);
     try {
-      const data = await requestAutofill(isBarcode
-        ? { mode: "barcode", barcode, amount, modelTier }
-        : { mode: "productSearch", query: raw, amount, modelTier });
-      applyAutofill(
-        data,
-        isBarcode
-          ? "Filled from barcode lookup."
-          : "Filled from product search.",
-      );
+      const data = await requestAutofill({ mode: "barcode", barcode, modelTier }) as MealFormValues & { servingGrams?: number };
+      const servingGrams = data.servingGrams ?? 100;
+      setBarcodeConfirm({
+        productName: data.name,
+        baseData: data,
+        servingGrams,
+        adjustedGrams: String(servingGrams),
+      });
       setProductLookup("");
       setScannerOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not find nutrition for that product.");
+      setError(err instanceof Error ? err.message : "Could not find nutrition for that barcode.");
     } finally {
       setAiLoading(false);
     }
   }
 
   function handleScannerDetected(barcode: string) {
-    setProductLookup(barcode);
-    void handleProductLookup(barcode);
+    setScannerOpen(false);
+    void handleBarcodeConfirmFlow(barcode);
   }
 
   function handleSubmit(e: FormEvent) {
@@ -306,43 +324,27 @@ export function MealForm({
                       <span className="quick-fill__icon" aria-hidden="true">🏷️</span>
                       <span className="quick-fill__title">Product lookup</span>
                     </div>
-                    <span className="quick-fill__meta">Barcode or name</span>
+                    <span className="quick-fill__meta">Scan or type number</span>
                   </div>
 
                   <div className="quick-fill__row quick-fill__row--lookup">
                     <input
                       type="text"
                       className="quick-fill__input"
-                      placeholder="Paste barcode or type product name"
+                      placeholder="Paste barcode number"
                       value={productLookup}
                       onChange={(e) => setProductLookup(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
-                          void handleProductLookup();
-                        }
-                      }}
-                      disabled={aiLoading}
-                    />
-                    <input
-                      type="number"
-                      min={1}
-                      step="1"
-                      className="quick-fill__input quick-fill__input--amount"
-                      placeholder="g/ml"
-                      value={lookupAmount}
-                      onChange={(e) => setLookupAmount(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void handleProductLookup();
+                          void handleBarcodeConfirmFlow(productLookup.trim());
                         }
                       }}
                       disabled={aiLoading}
                     />
                     <button
                       type="button"
-                      onClick={() => void handleProductLookup()}
+                      onClick={() => void handleBarcodeConfirmFlow(productLookup.trim())}
                       disabled={aiLoading || !productLookup.trim()}
                       className="btn-tonal btn-sm quick-fill__action"
                     >
@@ -350,7 +352,7 @@ export function MealForm({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setScannerOpen((open) => !open)}
+                      onClick={() => { setBarcodeConfirm(null); setScannerOpen((open) => !open); }}
                       disabled={aiLoading}
                       className="btn-ghost btn-sm quick-fill__action"
                     >
@@ -364,6 +366,63 @@ export function MealForm({
                         onDetected={handleScannerDetected}
                         onClose={() => setScannerOpen(false)}
                       />
+                    </div>
+                  )}
+
+                  {barcodeConfirm && (
+                    <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", background: "rgba(104,185,132,0.08)", border: "1px solid rgba(104,185,132,0.25)" }}>
+                      <p style={{ fontSize: "0.875rem", fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--md-on-surface)" }}>
+                        📦 {barcodeConfirm.productName}
+                      </p>
+                      <p style={{ fontSize: "0.8125rem", color: "var(--md-on-surface-variant)", marginBottom: "var(--space-3)" }}>
+                        Nutrition data is for <strong>{barcodeConfirm.servingGrams}g</strong>. Adjust to the amount you ate:
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-3)" }}>
+                        <input
+                          type="number"
+                          min={1}
+                          step="1"
+                          className="quick-fill__input quick-fill__input--amount"
+                          value={barcodeConfirm.adjustedGrams}
+                          onChange={(e) => setBarcodeConfirm((prev) => prev ? { ...prev, adjustedGrams: e.target.value } : null)}
+                        />
+                        <span style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)" }}>g</span>
+                      </div>
+                      {(() => {
+                        const g = parseFloat(barcodeConfirm.adjustedGrams);
+                        const scaled = Number.isFinite(g) && g > 0
+                          ? scaleNutrition(barcodeConfirm.baseData, barcodeConfirm.servingGrams, g)
+                          : null;
+                        return scaled ? (
+                          <div style={{ display: "flex", gap: "var(--space-4)", flexWrap: "wrap", marginBottom: "var(--space-3)", fontSize: "0.8125rem", color: "var(--md-on-surface-variant)" }}>
+                            <span><strong style={{ color: "var(--md-on-surface)" }}>{Math.round(scaled.calories)}</strong> kcal</span>
+                            <span><strong style={{ color: "var(--md-on-surface)" }}>{scaled.protein}g</strong> protein</span>
+                            <span><strong style={{ color: "var(--md-on-surface)" }}>{scaled.carbs}g</strong> carbs</span>
+                            <span><strong style={{ color: "var(--md-on-surface)" }}>{scaled.fat}g</strong> fat</span>
+                          </div>
+                        ) : null;
+                      })()}
+                      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                        <button
+                          type="button"
+                          className="btn-ghost btn-sm"
+                          onClick={() => setBarcodeConfirm(null)}
+                        >
+                          ✕ Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-primary btn-sm"
+                          onClick={() => {
+                            const g = parseFloat(barcodeConfirm.adjustedGrams);
+                            if (!Number.isFinite(g) || g <= 0) { setError("Grams must be a positive number."); return; }
+                            applyAutofill(scaleNutrition(barcodeConfirm.baseData, barcodeConfirm.servingGrams, g), `Filled from barcode — ${g}g`);
+                            setBarcodeConfirm(null);
+                          }}
+                        >
+                          ✓ Confirm
+                        </button>
+                      </div>
                     </div>
                   )}
                 </section>
@@ -434,7 +493,7 @@ export function MealForm({
                 {quickFillTipsOpen && (
                   <div className="quick-fill__tips-panel">
                     <p className="quick-fill__hint">
-                      Product lookup: add an optional amount in g/ml. If left blank, the app uses the serving size or 100g/100ml.
+                      Product lookup: scan a barcode or paste the number. After lookup you can adjust grams — macros scale automatically.
                     </p>
                     <p className="quick-fill__hint">
                       Assistant mode: include rough amounts for the best match. The app checks food data first, then fills any gaps with AI.

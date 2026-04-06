@@ -57,6 +57,6 @@ export const aiLogResponseSchema = z.object({
 });
 
 export type AiLogRequest  = z.infer<typeof aiLogRequestSchema>;
-export type AiLogResponse = z.infer<typeof aiLogResponseSchema>;
+export type AiLogResponse = z.infer<typeof aiLogResponseSchema> & { servingGrams?: number };
 export type AiModelTier = z.infer<typeof aiModelTierSchema>;
 

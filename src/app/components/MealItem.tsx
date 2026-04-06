@@ -8,6 +8,9 @@ type Props = {
   meal: LocalMeal;
   onEdit: (meal: LocalMeal) => void;
   onDelete: (id: string) => void;
+  mergeMode?: boolean;
+  selected?: boolean;
+  onSelect?: (id: string) => void;
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -18,9 +21,13 @@ const CATEGORY_ICONS: Record<string, string> = {
   Other:     "☕",
 };
 
-export function MealItem({ meal, onEdit, onDelete }: Props) {
+export function MealItem({ meal, onEdit, onDelete, mergeMode, selected, onSelect }: Props) {
   return (
-    <div className="meal-item">
+    <div
+      className={`meal-item${mergeMode && selected ? " meal-item--selected" : ""}`}
+      onClick={mergeMode ? () => onSelect?.(meal.id) : undefined}
+      style={mergeMode ? { cursor: "pointer" } : undefined}
+    >
       <div className="meal-item__body">
         {/* Name + category chip */}
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
@@ -64,22 +71,39 @@ export function MealItem({ meal, onEdit, onDelete }: Props) {
 
       {/* Actions */}
       <div className="meal-item__actions">
-        <button
-          className="btn-ghost btn-sm"
-          onClick={() => onEdit(meal)}
-          aria-label={`Edit ${meal.name}`}
-          title="Edit meal"
-        >
-          ✏️
-        </button>
-        <button
-          className="btn-danger-ghost btn-sm"
-          onClick={() => onDelete(meal.id)}
-          aria-label={`Delete ${meal.name}`}
-          title="Delete meal"
-        >
-          🗑
-        </button>
+        {mergeMode ? (
+          <div
+            style={{
+              width: 22, height: 22, borderRadius: "50%",
+              border: `2px solid ${selected ? "var(--md-primary)" : "var(--md-outline-variant)"}`,
+              background: selected ? "var(--md-primary)" : "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, transition: "background 0.15s, border-color 0.15s",
+            }}
+            aria-hidden="true"
+          >
+            {selected && <span style={{ color: "var(--md-on-primary)", fontSize: "0.75rem", fontWeight: 900 }}>✓</span>}
+          </div>
+        ) : (
+          <>
+            <button
+              className="btn-ghost btn-sm"
+              onClick={() => onEdit(meal)}
+              aria-label={`Edit ${meal.name}`}
+              title="Edit meal"
+            >
+              ✏️
+            </button>
+            <button
+              className="btn-danger-ghost btn-sm"
+              onClick={() => onDelete(meal.id)}
+              aria-label={`Delete ${meal.name}`}
+              title="Delete meal"
+            >
+              🗑
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
