@@ -44,11 +44,25 @@ export const foodSuggestionSchema = z.object({
   ...nutritionInputSchema.shape,
 });
 
+export const foodSuggestionSectionItemSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  note: z.string().trim().min(1).max(160),
+});
+
+export const foodSuggestionSectionSchema = z.object({
+  nutrient: z.enum(["protein", "fibre", "omega3"]),
+  label: z.string().trim().min(1).max(100),
+  items: z.array(foodSuggestionSectionItemSchema).min(1).max(8),
+});
+
 export const foodSuggestionResponseSchema = z.object({
   suggestions: z.array(foodSuggestionSchema).min(3).max(5),
+  sections: z.array(foodSuggestionSectionSchema).optional(),
 });
 
 export type FoodSuggestionRequest = z.infer<typeof foodSuggestionRequestSchema>;
 export type FoodSuggestion = z.infer<typeof foodSuggestionSchema>;
+export type FoodSuggestionSection = z.infer<typeof foodSuggestionSectionSchema>;
+export type FoodSuggestionSectionItem = z.infer<typeof foodSuggestionSectionItemSchema>;
 export type FoodSuggestionResponse = z.infer<typeof foodSuggestionResponseSchema>;
 

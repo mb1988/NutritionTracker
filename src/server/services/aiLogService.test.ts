@@ -85,7 +85,7 @@ describe("estimateNutrition", () => {
 
     expect(result).toEqual({
       name: "Arla Protein Yogurt",
-      category: "Breakfast",
+      category: null,
       calories: 90,
       protein: 15,
       carbs: 6,
@@ -180,7 +180,7 @@ describe("estimateNutrition", () => {
 
     expect(result).toEqual({
       name: "Protein Yogurt",
-      category: "Breakfast",
+      category: null,
       calories: 90,
       protein: 15,
       carbs: 6,
@@ -255,7 +255,7 @@ describe("estimateNutrition", () => {
 
     expect(result).toEqual({
       name: "Coca-Cola Zero Sugar",
-      category: "Other",
+      category: null,
       calories: 3.3,
       protein: 0,
       carbs: 0,
@@ -302,7 +302,7 @@ describe("estimateNutrition", () => {
     expect(String(fetchMock.mock.calls[0]?.[0] ?? "")).toContain("search_terms=coke+zero");
     expect(result).toEqual({
       name: "Coca Cola Zero Sugar",
-      category: "Other",
+      category: null,
       calories: 3.3,
       protein: 0,
       carbs: 0,

@@ -4,6 +4,8 @@ import {
   type FoodSuggestion,
   type FoodSuggestionRequest,
   type FoodSuggestionResponse,
+  type FoodSuggestionSection,
+  type FoodSuggestionSectionItem,
 } from "@/server/contracts/foodSuggestions";
 
 const CAP_KEYS = ["calories", "carbs", "fat", "satFat", "addedSugar", "naturalSugar", "salt", "alcohol"] as const;
@@ -147,6 +149,104 @@ const HEALTHY_IDEA_CATALOG: CatalogIdea[] = [
   },
 ];
 
+// ─── Per-nutrient suggestion catalogs ────────────────────────────────────────
+
+const PROTEIN_IDEAS: FoodSuggestionSectionItem[] = [
+  { name: "Chicken breast", note: "One of the leanest sources — grill, bake or poach." },
+  { name: "Greek yoghurt", note: "High protein snack — plain or with berries." },
+  { name: "Tuna", note: "Tinned or fresh — great in a bowl or on rice cakes." },
+  { name: "Eggs", note: "Fast to cook and works at any time of day." },
+  { name: "Cottage cheese", note: "Light and filling — eat with veg or on toast." },
+  { name: "Turkey slices", note: "Low-fat option for a quick wrap or sandwich." },
+  { name: "Skyr", note: "Thick Icelandic yoghurt with very high protein." },
+  { name: "Lentils", note: "Also high in fibre — add to soups or stews." },
+  { name: "White fish (cod / haddock)", note: "Low calorie, high protein — steam or pan-fry." },
+  { name: "Tofu", note: "Pan-fry with soy sauce for a filling, protein-rich option." },
+  { name: "Prawns", note: "Fast to cook — great stir-fried with veg." },
+  { name: "Sardines", note: "Tinned are convenient and also rich in omega-3." },
+  { name: "Quark", note: "Low-fat soft cheese — use like yoghurt or in dips." },
+  { name: "Edamame", note: "Great snack pot — also adds fibre." },
+  { name: "Lean beef mince", note: "Small portion in a bowl or with veg." },
+  { name: "Tempeh", note: "Fermented soy — more protein than tofu, nutty flavour." },
+  { name: "Ham (unsmoked)", note: "Thin slices for a quick, low-fat protein boost." },
+  { name: "Protein yoghurt", note: "Ready-made high-protein pot — read the label for added sugar." },
+];
+
+const FIBRE_IDEAS: FoodSuggestionSectionItem[] = [
+  { name: "Porridge oats", note: "Slow-release and very filling — top with seeds." },
+  { name: "Raspberries", note: "Low sugar, high fibre — eat as a snack or with yoghurt." },
+  { name: "Chickpeas", note: "Roast as a crunchy snack or add to a salad." },
+  { name: "Lentils", note: "Soup or dhal — also adds protein." },
+  { name: "Chia seeds", note: "Mix into yoghurt, porridge or a smoothie." },
+  { name: "Broccoli", note: "Steam or roast — quick and easy side." },
+  { name: "Black beans", note: "Great in a bowl, burrito or salad." },
+  { name: "Avocado", note: "On toast or in a salad — also healthy fats." },
+  { name: "Whole grain bread", note: "Swap white bread for a meaningful fibre boost." },
+  { name: "Pear or apple (with skin)", note: "Leave the skin on for maximum fibre." },
+  { name: "Ground flaxseed", note: "Sprinkle on cereal or yoghurt — also adds omega-3." },
+  { name: "Edamame", note: "Snack pot — also good for protein." },
+  { name: "Sweet potato (with skin)", note: "Bake whole for the most fibre." },
+  { name: "Split peas", note: "Smooth soup base — excellent fibre content." },
+  { name: "Kiwi fruit", note: "Two kiwis contain as much fibre as a slice of bread." },
+  { name: "Barley", note: "Use instead of rice — one of the highest-fibre grains." },
+  { name: "Mixed nuts", note: "Small handful — also adds healthy fats." },
+  { name: "Kidney beans", note: "Add to chilli, stew or salad." },
+];
+
+const OMEGA3_IDEAS: FoodSuggestionSectionItem[] = [
+  { name: "Salmon", note: "Fresh or tinned — one of the richest sources." },
+  { name: "Mackerel", note: "Tinned in spring water — easy and high impact." },
+  { name: "Sardines", note: "Tinned on toast — also a good protein source." },
+  { name: "Walnuts", note: "Small handful as a snack — plant-based omega-3." },
+  { name: "Chia seeds", note: "Mix into yoghurt or overnight oats." },
+  { name: "Ground flaxseed", note: "Ground absorbs better — add to cereal or a smoothie." },
+  { name: "Herring / rollmop", note: "Pickled or grilled — very high omega-3 per gram." },
+  { name: "Trout", note: "Bake like salmon — similar omega-3 profile." },
+  { name: "Anchovies", note: "Add to pasta, pizza or a salad dressing." },
+  { name: "Hemp seeds", note: "Sprinkle on salads, yoghurt or smoothies." },
+  { name: "Smoked salmon", note: "On rice cakes or with eggs — quick and easy." },
+  { name: "Seabass or sea bream", note: "Lighter fish that still delivers useful omega-3." },
+];
+
+type SectionNutrientKey = "protein" | "fibre" | "omega3";
+
+function buildNutrientSections(input: FoodSuggestionRequest): FoodSuggestionSection[] {
+  const remaining = computeRemaining(input);
+  const sections: FoodSuggestionSection[] = [];
+
+  const toGo = (value: number) => Math.round(Math.max(0, value));
+
+  if (remaining.protein > 0) {
+    sections.push({
+      nutrient: "protein",
+      label: `Protein — ${toGo(remaining.protein)}g still to reach your goal`,
+      items: pickRandom(PROTEIN_IDEAS, 5),
+    });
+  }
+
+  if (remaining.fibre > 0) {
+    sections.push({
+      nutrient: "fibre",
+      label: `Fibre — ${toGo(remaining.fibre)}g still to reach your goal`,
+      items: pickRandom(FIBRE_IDEAS, 5),
+    });
+  }
+
+  if (remaining.omega3 > 0) {
+    sections.push({
+      nutrient: "omega3",
+      label: `Omega-3 — ${toGo(remaining.omega3)}mg still to reach your goal`,
+      items: pickRandom(OMEGA3_IDEAS, 5),
+    });
+  }
+
+  return sections;
+}
+
+function pickRandom<T>(arr: T[], n: number): T[] {
+  return [...arr].sort(() => Math.random() - 0.5).slice(0, n);
+}
+
 const AI_SYSTEM_PROMPT = `You are an expert nutrition assistant.
 
 Return STRICT JSON only. No markdown. No commentary.
@@ -187,10 +287,11 @@ Rules:
 
 export async function generateFoodSuggestions(input: FoodSuggestionRequest): Promise<FoodSuggestionResponse> {
   const fallback = buildFallbackSuggestions(input);
+  const sections = buildNutrientSections(input);
   const apiKey = process.env.OPENAI_API_KEY?.trim();
 
   if (!apiKey) {
-    return { suggestions: fallback };
+    return { suggestions: fallback, sections };
   }
 
   const openai = new OpenAI({ apiKey });
@@ -220,15 +321,15 @@ export async function generateFoodSuggestions(input: FoodSuggestionRequest): Pro
 
     const raw = completion.choices[0]?.message?.content;
     if (!raw) {
-      return { suggestions: fallback };
+      return { suggestions: fallback, sections };
     }
 
     const parsed = JSON.parse(raw);
     const validated = foodSuggestionResponseSchema.parse(parsed);
     const merged = mergeWithFallback(validated.suggestions, fallback, input);
-    return { suggestions: merged };
+    return { suggestions: merged, sections };
   } catch {
-    return { suggestions: fallback };
+    return { suggestions: fallback, sections };
   }
 }
 
@@ -260,15 +361,19 @@ function buildFallbackSuggestions(input: FoodSuggestionRequest): FoodSuggestion[
   const selected: FoodSuggestion[] = [];
   const used = new Set<string>();
 
-  const bestNew = candidates
-    .filter((candidate) => candidate.source === "new")
-    .sort((a, b) => b.score - a.score)[0];
+  // Shuffle within score tiers to vary results on each refresh
+  const jitteredCandidates = candidates
+    .map((c) => ({ ...c, score: c.score + Math.random() * 0.25 }))
+    .sort((a, b) => b.score - a.score);
+
+  const bestNew = jitteredCandidates
+    .filter((candidate) => candidate.source === "new")[0];
   if (bestNew) {
     selected.push(stripScore(bestNew));
     used.add(normalizeName(bestNew.name));
   }
 
-  for (const candidate of candidates.sort((a, b) => b.score - a.score)) {
+  for (const candidate of jitteredCandidates) {
     const key = normalizeName(candidate.name);
     if (used.has(key)) continue;
     selected.push(stripScore(candidate));
