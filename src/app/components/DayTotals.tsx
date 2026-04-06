@@ -103,7 +103,7 @@ function localISODate(): string {
 }
 
 export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave, meals = [], savedMeals = [] }: Props) {
-  const remaining = Math.max(0, goals.calories - totals.calories);
+  const remaining = Math.round(Math.max(0, goals.calories - totals.calories));
   const isOver    = totals.calories > goals.calories;
   const isToday   = selectedDate === localISODate();
   const title     = isToday ? "Today’s Progress" : `Progress for ${formatDisplayDate(selectedDate)}`;

@@ -325,6 +325,10 @@ function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddM
         meals={(day?.meals ?? []).map((m) => ({ ...m, date }))}
         onEdit={(meal) => setEditingMeal(meal as ApiMeal)}
         onDelete={(id) => onDeleteMeal(id, date)}
+        onMerge={async (merged, ids) => {
+          await onAddMeal(date, merged);
+          for (const id of ids) await onDeleteMeal(id, date);
+        }}
       />
 
       {/* Add / edit meal form — with saved meal templates */}
@@ -441,6 +445,16 @@ export default function HomePage() {
       setEditingMeal((prev) => (prev?.id === id ? null : prev));
     },
     [deleteMeal, selectedDate],
+  );
+
+  const handleMerge = useCallback(
+    async (merged: MealFormValues, idsToDelete: string[]) => {
+      await addMeal(selectedDate, merged);
+      for (const id of idsToDelete) {
+        await deleteMeal(id, selectedDate);
+      }
+    },
+    [addMeal, deleteMeal, selectedDate],
   );
 
   /** Navigate to a past day's detail view, scrolling to top */
@@ -667,6 +681,7 @@ export default function HomePage() {
               setEditScrollRequest((prev) => prev + 1);
             }}
             onDelete={handleDelete}
+            onMerge={handleMerge}
           />
         </div>
       )}

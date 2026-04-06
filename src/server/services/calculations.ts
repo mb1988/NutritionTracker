@@ -27,6 +27,8 @@ export const ZERO_MACROS: Readonly<MacroValues> = Object.freeze({
   omega3:       0,
 });
 
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
 /**
  * Re-aggregates all nutrition fields from a list of meals.
  *
@@ -35,7 +37,7 @@ export const ZERO_MACROS: Readonly<MacroValues> = Object.freeze({
  * many concurrent create/update/delete operations.
  */
 export function calculateDayTotals<T extends MacroValues>(meals: T[]): MacroValues {
-  return meals.reduce(
+  const raw = meals.reduce(
     (totals, meal) => ({
       calories:     totals.calories     + meal.calories,
       protein:      totals.protein      + meal.protein,
@@ -51,4 +53,17 @@ export function calculateDayTotals<T extends MacroValues>(meals: T[]): MacroValu
     }),
     { ...ZERO_MACROS },
   );
+  return {
+    calories:     r1(raw.calories),
+    protein:      r1(raw.protein),
+    carbs:        r1(raw.carbs),
+    fat:          r1(raw.fat),
+    satFat:       r1(raw.satFat),
+    fibre:        r1(raw.fibre),
+    addedSugar:   r1(raw.addedSugar),
+    naturalSugar: r1(raw.naturalSugar),
+    salt:         r1(raw.salt),
+    alcohol:      r1(raw.alcohol),
+    omega3:       r1(raw.omega3),
+  };
 }

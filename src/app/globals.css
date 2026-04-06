@@ -832,6 +832,7 @@ hr {
 .meal-item:last-child { border-bottom: none; }
 .meal-item:nth-child(odd) { background: rgba(255,255,255,0.02); }
 .meal-item:hover { background: rgba(255,255,255,0.05); }
+.meal-item--selected { background: rgba(104,185,132,0.1) !important; border-left: 3px solid var(--md-primary); }
 
 .meal-item__body {
   display: flex;

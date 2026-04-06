@@ -18,8 +18,10 @@ function saveMeals(meals: LocalMeal[]) {
   localStorage.setItem(LS_KEY, JSON.stringify(meals));
 }
 
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
 function computeTotals(meals: LocalMeal[]): DaySnapshot {
-  return meals.reduce(
+  const raw = meals.reduce(
     (acc, m) => ({
       calories:     acc.calories     + m.calories,
       protein:      acc.protein      + m.protein,
@@ -35,6 +37,19 @@ function computeTotals(meals: LocalMeal[]): DaySnapshot {
     }),
     { calories: 0, protein: 0, carbs: 0, fat: 0, satFat: 0, fibre: 0, addedSugar: 0, naturalSugar: 0, salt: 0, alcohol: 0, omega3: 0 },
   );
+  return {
+    calories:     r1(raw.calories),
+    protein:      r1(raw.protein),
+    carbs:        r1(raw.carbs),
+    fat:          r1(raw.fat),
+    satFat:       r1(raw.satFat),
+    fibre:        r1(raw.fibre),
+    addedSugar:   r1(raw.addedSugar),
+    naturalSugar: r1(raw.naturalSugar),
+    salt:         r1(raw.salt),
+    alcohol:      r1(raw.alcohol),
+    omega3:       r1(raw.omega3),
+  };
 }
 
 // ── Hook ──────────────────────────────────────────────────────
