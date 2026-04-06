@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { type MealFormValues, type SelectableMetricKey } from "@/app/types";
+import { type MealFormValues, type SelectableMetricKey, type DailyGoals } from "@/app/types";
 import { useNutritionData, type ApiDay, type ApiMeal } from "@/app/hooks/useNutritionData";
 import { useGoals }      from "@/app/hooks/useGoals";
 import { useSavedMeals } from "@/app/hooks/useSavedMeals";
@@ -77,13 +77,13 @@ function getColor(value: number, target: number, reverse: boolean) {
   return pct <= 0.75 ? "var(--status-good)" : pct <= 1 ? "var(--status-warn)" : "var(--status-over)";
 }
 
-function getDayScore(day: ApiDay) {
+function getDayScore(day: ApiDay, goals: DailyGoals) {
   let good = 0;
-  if (day.totalCalories <= 2200)  good++;
-  if (day.totalAddedSugar <= 25)  good++;
-  if (day.totalSatFat <= 20)      good++;
-  if (day.totalFibre >= 25)       good++;
-  if (day.totalProtein >= 80)     good++;
+  if (day.totalCalories <= goals.calories)   good++;
+  if (day.totalAddedSugar <= goals.addedSugar) good++;
+  if (day.totalSatFat <= goals.satFat)       good++;
+  if (day.totalFibre >= goals.fibre)         good++;
+  if (day.totalProtein >= goals.protein)     good++;
   return good;
 }
 
@@ -117,8 +117,8 @@ function apiDayToSnapshot(day: ApiDay | null) {
   };
 }
 
-function DayCard({ day, onClick }: { day: ApiDay; onClick: () => void }) {
-  const score = getDayScore(day);
+function DayCard({ day, goals, onClick }: { day: ApiDay; goals: DailyGoals; onClick: () => void }) {
+  const score = getDayScore(day, goals);
   const { emoji, label, cls } = scoreInfo(score);
   return (
     <div
@@ -764,7 +764,7 @@ export default function HomePage() {
             ) : (
               <div className="stack" style={{ gap: "var(--space-3)" }}>
                 {allDays.map((d) => (
-                  <DayCard key={d.date} day={d} onClick={() => navigateToHistoryDate(d.date)} />
+                  <DayCard key={d.date} day={d} goals={goals} onClick={() => navigateToHistoryDate(d.date)} />
                 ))}
               </div>
             )}

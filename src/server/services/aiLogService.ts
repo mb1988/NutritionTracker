@@ -65,7 +65,7 @@ Return a single JSON object with EXACTLY these fields — no extra keys, no mark
 
 {
   "name":         "Short descriptive meal name (e.g. 'Grilled Chicken Breast with Rice')",
-  "category":     One of "Breakfast", "Lunch", "Dinner", "Snack", "Other", or null if unclear,
+  "category":     Always return null — the user will assign the category themselves,
   "calories":     number (kcal),
   "protein":      number (grams),
   "carbs":        number (grams, total carbohydrates),
@@ -159,7 +159,7 @@ async function completeNutritionWithAi(
             description,
             authoritativeValues: lockedValues,
             instruction: Object.keys(lockedValues).length
-              ? "Use authoritativeValues exactly for the fields provided. Infer only missing fields and a user-friendly meal name/category."
+              ? "Use authoritativeValues exactly for the fields provided. Infer only missing fields and a user-friendly meal name."
               : "Estimate the complete nutrition profile.",
           }),
         },
@@ -190,7 +190,7 @@ async function completeNutritionWithAi(
   }
 
   const validated = aiLogResponseSchema.parse(parsed);
-  const merged = mergeLockedValues(validated, lockedValues);
+  const merged = mergeLockedValues({ ...validated, category: null }, lockedValues);
   return finalizeNutrition(merged);
 }
 
@@ -367,7 +367,7 @@ function buildOpenFoodFactsFallback(description: string, match: OpenFoodFactsMat
     name: typeof match.values.name === "string" && match.values.name.trim()
       ? match.values.name
       : buildFallbackName(description),
-    category: inferCategoryFromText(description),
+    category: null,
     calories: match.values.calories ?? 0,
     protein: match.values.protein ?? 0,
     carbs: match.values.carbs ?? 0,
@@ -584,15 +584,6 @@ function tokenise(value: string): string[] {
 function toFiniteNumber(value: unknown): number | null {
   const num = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
   return Number.isFinite(num) ? num : null;
-}
-
-function inferCategoryFromText(description: string): AiLogResponse["category"] {
-  const lowered = description.toLowerCase();
-  if (/(breakfast|porridge|oats|toast|cereal|granola|croissant|eggs|yogurt|yoghurt)/.test(lowered)) return "Breakfast";
-  if (/(sandwich|wrap|salad|lunch|baguette|panini|soup)/.test(lowered)) return "Lunch";
-  if (/(dinner|pasta|curry|rice|steak|salmon|chicken|pizza|burger)/.test(lowered)) return "Dinner";
-  if (/(snack|bar|biscuit|crisps|chips|nuts|shake|smoothie|fruit)/.test(lowered)) return "Snack";
-  return "Other";
 }
 
 function looksLikeNaturalSugarSource(value: string): boolean {

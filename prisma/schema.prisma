@@ -12,6 +12,7 @@ model User {
   email              String?     @unique
   name               String?
   image              String?
+  goals              String?
   stepSyncEnabled    Boolean     @default(false)
   stepSyncProvider   String?
   stepSyncTokenHash  String?     @unique
