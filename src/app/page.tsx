@@ -120,6 +120,7 @@ function apiDayToSnapshot(day: ApiDay | null) {
 function DayCard({ day, goals, onClick, onDelete }: { day: ApiDay; goals: DailyGoals; onClick: () => void; onDelete: (date: string) => void }) {
   const score = getDayScore(day, goals);
   const { emoji, label, cls } = scoreInfo(score);
+  const [confirming, setConfirming] = useState(false);
   return (
     <div
       onClick={onClick}
@@ -167,14 +168,33 @@ function DayCard({ day, goals, onClick, onDelete }: { day: ApiDay; goals: DailyG
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
         <span className={`score-chip ${cls}`}>{emoji} {label}</span>
         <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontWeight: 600 }}>{day.meals.length} meals</span>
-        <button
-          className="btn-ghost btn-sm"
-          style={{ fontSize: "0.6875rem", color: "var(--status-over)", padding: "2px 8px", marginTop: 2 }}
-          onClick={(e) => { e.stopPropagation(); onDelete(day.date); }}
-          title="Delete this day"
-        >
-          Delete
-        </button>
+        {confirming ? (
+          <div style={{ display: "flex", gap: 6, marginTop: 2 }} onClick={(e) => e.stopPropagation()}>
+            <button
+              className="btn-ghost btn-sm"
+              style={{ fontSize: "0.6875rem", padding: "2px 8px" }}
+              onClick={() => setConfirming(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn-ghost btn-sm"
+              style={{ fontSize: "0.6875rem", color: "var(--status-over)", padding: "2px 8px" }}
+              onClick={() => { setConfirming(false); onDelete(day.date); }}
+            >
+              Delete
+            </button>
+          </div>
+        ) : (
+          <button
+            className="btn-ghost btn-sm"
+            style={{ fontSize: "0.6875rem", color: "var(--md-on-surface-variant)", padding: "2px 8px", marginTop: 2 }}
+            onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
+            title="Delete this day"
+          >
+            🗑
+          </button>
+        )}
       </div>
     </div>
   );
