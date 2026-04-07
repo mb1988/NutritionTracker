@@ -70,6 +70,7 @@ export type UseNutritionData = {
   deleteMeal: (mealId: string, date: string) => Promise<void>;
   updateMeal: (mealId: string, values: MealFormValues, date: string) => Promise<void>;
   updateSteps: (date: string, steps: number) => Promise<void>;
+  deleteDay: (date: string) => Promise<void>;
   refreshDay: (date: string) => Promise<void>;
   refreshAll: () => Promise<void>;
 };
@@ -147,6 +148,12 @@ export function useNutritionData(selectedDate: string): UseNutritionData {
     await refreshDay(date);
   }, [refreshDay]);
 
-  return { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, updateSteps, refreshDay, refreshAll };
+  const deleteDay = useCallback(async (date: string) => {
+    await fetch(`/api/days?date=${date}`, { method: "DELETE", headers: HEADERS });
+    setAllDays((prev) => prev.filter((d) => d.date !== date));
+    if (selectedDate === date) setSelectedDay(null);
+  }, [selectedDate]);
+
+  return { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, updateSteps, deleteDay, refreshDay, refreshAll };
 }
 
