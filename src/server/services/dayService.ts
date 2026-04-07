@@ -108,6 +108,14 @@ export async function updateDaySteps(
   });
 }
 
+/** Deletes a day and all its meals (cascade). */
+export async function deleteDay(userId: string, date: string) {
+  validateDate(date);
+  await prisma.day.deleteMany({
+    where: { userId, date },
+  });
+}
+
 /** Returns all days for a user that have at least one meal or logged steps, ordered newest first. */
 export async function getAllDays(userId: string) {
   return prisma.day.findMany({

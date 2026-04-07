@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createDaySchema, dayQuerySchema } from "@/server/contracts/days";
-import { getDayByDate, getOrCreateDay, getAllDays, updateDaySteps } from "@/server/services/dayService";
+import { getDayByDate, getOrCreateDay, getAllDays, updateDaySteps, deleteDay } from "@/server/services/dayService";
 import { getAuthenticatedUserId, handleApiError } from "@/server/http";
 
 const updateStepsSchema = z.object({
@@ -46,6 +46,18 @@ export async function PATCH(request: NextRequest) {
     const { date, steps } = updateStepsSchema.parse(body);
     const day             = await updateDaySteps(userId, date, steps);
     return NextResponse.json({ day }, { status: 200 });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId    = await getAuthenticatedUserId();
+    const dateParam = request.nextUrl.searchParams.get("date");
+    const { date }  = dayQuerySchema.parse({ date: dateParam });
+    await deleteDay(userId, date);
+    return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
     return handleApiError(error);
   }
