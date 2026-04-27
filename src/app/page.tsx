@@ -172,7 +172,7 @@ function DayCard({ day, goals, onClick }: { day: ApiDay; goals: DailyGoals; onCl
   );
 }
 
-function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddMeal, onUpdateMeal, onDeleteMeal, onStepsSave, savedMeals, onSaveTemplate, onDeleteSaved }: {
+function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddMeal, onUpdateMeal, onDeleteMeal, onMergeMeals, onStepsSave, savedMeals, onSaveTemplate, onDeleteSaved }: {
   day: ApiDay | null;
   date: string;
   goals: Parameters<typeof DayTotals>[0]["goals"];
@@ -182,6 +182,7 @@ function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddM
   onAddMeal: (date: string, values: MealFormValues) => Promise<void>;
   onUpdateMeal: (mealId: string, values: MealFormValues, date: string) => Promise<void>;
   onDeleteMeal: (mealId: string, date: string) => Promise<void>;
+  onMergeMeals: (date: string, values: MealFormValues, mealIdsToDelete: string[]) => Promise<void>;
   onStepsSave: (date: string, steps: number) => Promise<void>;
   savedMeals: ReturnType<typeof useSavedMeals>["savedMeals"];
   onSaveTemplate: (values: MealFormValues) => Promise<void>;
@@ -326,8 +327,7 @@ function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddM
         onEdit={(meal) => setEditingMeal(meal as ApiMeal)}
         onDelete={(id) => onDeleteMeal(id, date)}
         onMerge={async (merged, ids) => {
-          await onAddMeal(date, merged);
-          for (const id of ids) await onDeleteMeal(id, date);
+          await onMergeMeals(date, merged, ids);
         }}
       />
 
@@ -396,7 +396,7 @@ export default function HomePage() {
   const [resettingDemo,  setResettingDemo]  = useState(false);
   const mealFormRef = useRef<HTMLDivElement | null>(null);
 
-  const { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, updateSteps, refreshAll } =
+  const { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, mergeMeals, updateSteps, refreshAll } =
     useNutritionData(selectedDate);
 
   const { goals, updateGoals }                    = useGoals();
@@ -449,12 +449,9 @@ export default function HomePage() {
 
   const handleMerge = useCallback(
     async (merged: MealFormValues, idsToDelete: string[]) => {
-      await addMeal(selectedDate, merged);
-      for (const id of idsToDelete) {
-        await deleteMeal(id, selectedDate);
-      }
+      await mergeMeals(selectedDate, merged, idsToDelete);
     },
-    [addMeal, deleteMeal, selectedDate],
+    [mergeMeals, selectedDate],
   );
 
   /** Navigate to a past day's detail view, scrolling to top */
@@ -743,6 +740,7 @@ export default function HomePage() {
             onAddMeal={addMeal}
             onUpdateMeal={updateMeal}
             onDeleteMeal={deleteMeal}
+            onMergeMeals={mergeMeals}
             onStepsSave={updateSteps}
             savedMeals={savedMeals}
             onSaveTemplate={saveMeal}

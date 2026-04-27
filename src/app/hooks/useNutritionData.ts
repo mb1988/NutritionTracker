@@ -50,14 +50,35 @@ const HEADERS = { "Content-Type": "application/json" };
 
 async function fetchDay(date: string): Promise<ApiDay | null> {
   const res = await fetch(`/api/days?date=${date}`, { headers: HEADERS });
+  if (!res.ok) throw new Error(`Failed to fetch day ${date}`);
   const data = await res.json();
   return data.day ?? null;
 }
 
 async function fetchAllDays(): Promise<ApiDay[]> {
   const res = await fetch("/api/days", { headers: HEADERS });
+  if (!res.ok) throw new Error("Failed to fetch days");
   const data = await res.json();
   return data.days ?? [];
+}
+
+async function requestOk(input: RequestInfo | URL, init?: RequestInit) {
+  const res = await fetch(input, init);
+  if (!res.ok) {
+    let message = `Request failed with status ${res.status}`;
+    try {
+      const data = await res.json();
+      if (typeof data?.error === "string") message = data.error;
+    } catch {
+      // Keep the status-based fallback.
+    }
+    throw new Error(message);
+  }
+  return res;
+}
+
+function shouldKeepDay(day: ApiDay) {
+  return day.meals.length > 0 || day.totalSteps > 0;
 }
 
 // ── Hook ──────────────────────────────────────────────────────
@@ -69,6 +90,7 @@ export type UseNutritionData = {
   addMeal: (date: string, values: MealFormValues) => Promise<void>;
   deleteMeal: (mealId: string, date: string) => Promise<void>;
   updateMeal: (mealId: string, values: MealFormValues, date: string) => Promise<void>;
+  mergeMeals: (date: string, values: MealFormValues, mealIdsToDelete: string[]) => Promise<void>;
   updateSteps: (date: string, steps: number) => Promise<void>;
   refreshDay: (date: string) => Promise<void>;
   refreshAll: () => Promise<void>;
@@ -97,16 +119,17 @@ export function useNutritionData(selectedDate: string): UseNutritionData {
 
   const refreshDay = useCallback(async (date: string) => {
     const day = await fetchDay(date);
-    setSelectedDay(day);
-    // Also update allDays in place
+    setSelectedDay((current) => (date === selectedDate ? day : current));
     setAllDays((prev) =>
       day
-        ? prev.some((d) => d.date === date)
+        ? shouldKeepDay(day)
+          ? prev.some((d) => d.date === date)
           ? prev.map((d) => (d.date === date ? day : d))
           : [day, ...prev].sort((a, b) => b.date.localeCompare(a.date))
+          : prev.filter((d) => d.date !== date)
         : prev,
     );
-  }, []);
+  }, [selectedDate]);
 
   const refreshAll = useCallback(async () => {
     const days = await fetchAllDays();
@@ -116,7 +139,7 @@ export function useNutritionData(selectedDate: string): UseNutritionData {
   }, [selectedDate]);
 
   const addMeal = useCallback(async (date: string, values: MealFormValues) => {
-    await fetch("/api/meals", {
+    await requestOk("/api/meals", {
       method: "POST",
       headers: HEADERS,
       body: JSON.stringify({ ...values, date }),
@@ -125,12 +148,12 @@ export function useNutritionData(selectedDate: string): UseNutritionData {
   }, [refreshDay]);
 
   const deleteMeal = useCallback(async (mealId: string, date: string) => {
-    await fetch(`/api/meals/${mealId}`, { method: "DELETE", headers: HEADERS });
+    await requestOk(`/api/meals/${mealId}`, { method: "DELETE", headers: HEADERS });
     await refreshDay(date);
   }, [refreshDay]);
 
   const updateMeal = useCallback(async (mealId: string, values: MealFormValues, date: string) => {
-    await fetch(`/api/meals/${mealId}`, {
+    await requestOk(`/api/meals/${mealId}`, {
       method: "PATCH",
       headers: HEADERS,
       body: JSON.stringify(values),
@@ -138,8 +161,22 @@ export function useNutritionData(selectedDate: string): UseNutritionData {
     await refreshDay(date);
   }, [refreshDay]);
 
+  const mergeMeals = useCallback(async (date: string, values: MealFormValues, mealIdsToDelete: string[]) => {
+    await requestOk("/api/meals", {
+      method: "POST",
+      headers: HEADERS,
+      body: JSON.stringify({ ...values, date }),
+    });
+
+    for (const mealId of mealIdsToDelete) {
+      await requestOk(`/api/meals/${mealId}`, { method: "DELETE", headers: HEADERS });
+    }
+
+    await refreshDay(date);
+  }, [refreshDay]);
+
   const updateSteps = useCallback(async (date: string, steps: number) => {
-    await fetch("/api/days", {
+    await requestOk("/api/days", {
       method: "PATCH",
       headers: HEADERS,
       body: JSON.stringify({ date, steps }),
@@ -147,6 +184,6 @@ export function useNutritionData(selectedDate: string): UseNutritionData {
     await refreshDay(date);
   }, [refreshDay]);
 
-  return { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, updateSteps, refreshDay, refreshAll };
+  return { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, mergeMeals, updateSteps, refreshDay, refreshAll };
 }
 

@@ -8,7 +8,7 @@ type Props = {
   meals: LocalMeal[];
   onEdit: (meal: LocalMeal) => void;
   onDelete: (id: string) => void;
-  onMerge: (merged: MealFormValues, idsToDelete: string[]) => void;
+  onMerge: (merged: MealFormValues, idsToDelete: string[]) => Promise<void>;
 };
 
 const NUMERIC_KEYS: (keyof MealFormValues)[] = [
@@ -41,6 +41,8 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mergeName, setMergeName] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [mergeSubmitting, setMergeSubmitting] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
 
   if (meals.length === 0) {
     return (
@@ -66,6 +68,7 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
       return next;
     });
     setConfirming(false);
+    setMergeError(null);
   }
 
   function enterMergeMode() {
@@ -73,6 +76,8 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
     setSelected(new Set());
     setConfirming(false);
     setMergeName("");
+    setMergeError(null);
+    setMergeSubmitting(false);
   }
 
   function exitMergeMode() {
@@ -80,6 +85,8 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
     setSelected(new Set());
     setConfirming(false);
     setMergeName("");
+    setMergeError(null);
+    setMergeSubmitting(false);
   }
 
   function startConfirm() {
@@ -88,11 +95,18 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
     setConfirming(true);
   }
 
-  function commitMerge() {
+  async function commitMerge() {
     const merged = sumMeals(selectedMeals);
     merged.name = mergeName.trim() || merged.name;
-    onMerge(merged, [...selected]);
-    exitMergeMode();
+    setMergeSubmitting(true);
+    setMergeError(null);
+    try {
+      await onMerge(merged, [...selected]);
+      exitMergeMode();
+    } catch (error) {
+      setMergeError(error instanceof Error ? error.message : "Could not merge meals.");
+      setMergeSubmitting(false);
+    }
   }
 
   const previewSum = selectedMeals.length >= 2 ? sumMeals(selectedMeals) : null;
@@ -199,18 +213,24 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
             style={{ fontSize: "0.9375rem", fontWeight: 600 }}
             value={mergeName}
             onChange={(e) => setMergeName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") commitMerge(); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !mergeSubmitting) void commitMerge(); }}
             autoFocus
+            disabled={mergeSubmitting}
           />
+          {mergeError && (
+            <p style={{ fontSize: "0.8125rem", color: "var(--status-over)", fontWeight: 700 }}>
+              {mergeError}
+            </p>
+          )}
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
-            <button type="button" className="btn-ghost btn-sm" onClick={() => setConfirming(false)}>← Back</button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setConfirming(false)} disabled={mergeSubmitting}>← Back</button>
             <button
               type="button"
               className="btn-primary btn-sm"
-              onClick={commitMerge}
-              disabled={!mergeName.trim()}
+              onClick={() => void commitMerge()}
+              disabled={!mergeName.trim() || mergeSubmitting}
             >
-              ✓ Confirm merge
+              {mergeSubmitting ? "Merging..." : "✓ Confirm merge"}
             </button>
           </div>
         </div>
