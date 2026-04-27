@@ -165,10 +165,8 @@ export function MealForm({
     }
   }
 
-  function loadSavedMeal(meal: SavedMeal) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _id, ...vals } = meal;
-    resetComposerState(vals);
+  function loadSavedMeal(meal: MealFormValues) {
+    resetComposerState(meal);
   }
 
   async function handleAiEstimate() {
@@ -510,10 +508,10 @@ export function MealForm({
             </div>
           )}
 
-          {/* Saved meal picker */}
-          {!isEditing && savedMeals && savedMeals.length > 0 && onDeleteSaved && (
+          {/* Past meal search */}
+          {!isEditing && (
             <div style={{ marginBottom: "var(--space-6)" }}>
-              <SavedMealPicker savedMeals={savedMeals} onSelect={loadSavedMeal} onDelete={onDeleteSaved} />
+              <SavedMealPicker savedMeals={savedMeals ?? []} onSelect={loadSavedMeal} onDelete={onDeleteSaved ?? (() => undefined)} />
             </div>
           )}
 
@@ -599,7 +597,7 @@ export function MealForm({
                   <button type="button" className="btn-ghost" onClick={handleClearForm}>Clear form</button>
                 )}
               </div>
-              {onSaveTemplate && (
+              {isEditing && onSaveTemplate && (
                 <button
                   type="button"
                   className={saved ? "btn-tonal btn-sm" : "btn-ghost btn-sm"}
