@@ -1180,6 +1180,37 @@ hr {
   margin-bottom: var(--space-5);
 }
 
+.goals-panel__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  margin-bottom: var(--space-4);
+}
+
+.goals-panel__toggle input {
+  margin-top: 3px;
+  accent-color: var(--md-primary);
+}
+
+.goals-panel__toggle span {
+  display: grid;
+  gap: 3px;
+}
+
+.goals-panel__toggle strong {
+  font-size: 0.8125rem;
+}
+
+.goals-panel__toggle small {
+  color: var(--md-on-surface-variant);
+  font-size: 0.75rem;
+}
+
 .goals-panel__actions {
   display: flex;
   justify-content: space-between;

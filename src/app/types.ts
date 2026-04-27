@@ -62,9 +62,12 @@ export type DailyGoals = {
   salt: number;
   alcohol: number;
   omega3: number;
+  stepCalorieAdjustment: boolean;
 };
 
-export type SelectableMetricKey = keyof DailyGoals;
+export type NumericGoalKey = Exclude<keyof DailyGoals, "stepCalorieAdjustment">;
+
+export type SelectableMetricKey = NumericGoalKey;
 
 export const NUTRITION_METRICS: Record<
   SelectableMetricKey,
@@ -179,6 +182,7 @@ export const DEFAULT_GOALS: DailyGoals = {
   salt: 6,
   alcohol: 2,
   omega3: 250,
+  stepCalorieAdjustment: false,
 };
 
 export const EMPTY_FORM_VALUES: MealFormValues = {

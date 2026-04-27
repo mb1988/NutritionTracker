@@ -34,6 +34,25 @@ type OpenFoodFactsMatch = {
   totalSugar: number;
 };
 
+const looseAiLogResponseSchema = aiLogResponseSchema
+  .partial({
+    calories: true,
+    protein: true,
+    carbs: true,
+    fat: true,
+    satFat: true,
+    fibre: true,
+    addedSugar: true,
+    naturalSugar: true,
+    salt: true,
+    alcohol: true,
+    omega3: true,
+  })
+  .extend({
+    name: aiLogResponseSchema.shape.name,
+    category: aiLogResponseSchema.shape.category.optional().nullable(),
+  });
+
 const OPEN_FOOD_FACTS_URL = "https://world.openfoodfacts.org/cgi/search.pl";
 const OFF_FIELDS = [
   "product_name",
@@ -189,8 +208,9 @@ async function completeNutritionWithAi(
     throw new AppError("AI returned invalid JSON", 502);
   }
 
-  const validated = aiLogResponseSchema.parse(parsed);
-  const merged = mergeLockedValues({ ...validated, category: null }, lockedValues);
+  const loose = looseAiLogResponseSchema.parse(parsed);
+  const completed = completeMissingNutrition({ ...loose, category: null });
+  const merged = mergeLockedValues(completed, lockedValues);
   return finalizeNutrition(merged);
 }
 
@@ -336,11 +356,11 @@ function mapProductToNutrition(product: OpenFoodFactsProduct, amount: number) {
     return null;
   }
 
-  const saturatedFat = readScaledNutrient(product, amount, "saturated-fat") ?? 0;
-  const fibre = readScaledNutrient(product, amount, "fiber") ?? 0;
-  const salt = readScaledNutrient(product, amount, "salt") ?? 0;
-  const alcoholGrams = readScaledNutrient(product, amount, "alcohol") ?? 0;
-  const omega3Grams = readScaledNutrient(product, amount, "omega-3-fat") ?? 0;
+  const saturatedFat = readScaledNutrient(product, amount, "saturated-fat");
+  const fibre = readScaledNutrient(product, amount, "fiber");
+  const salt = readScaledNutrient(product, amount, "salt");
+  const alcoholGrams = readScaledNutrient(product, amount, "alcohol");
+  const omega3Grams = readScaledNutrient(product, amount, "omega-3-fat");
   const sugars = readScaledNutrient(product, amount, "sugars") ?? 0;
 
   return {
@@ -350,11 +370,11 @@ function mapProductToNutrition(product: OpenFoodFactsProduct, amount: number) {
       protein,
       carbs,
       fat,
-      satFat: saturatedFat,
-      fibre,
-      salt,
-      alcohol: alcoholGrams / 8,
-      omega3: omega3Grams * 1000,
+      ...(saturatedFat != null && { satFat: saturatedFat }),
+      ...(fibre != null && { fibre }),
+      ...(salt != null && { salt }),
+      ...(alcoholGrams != null && { alcohol: alcoholGrams / 8 }),
+      ...(omega3Grams != null && { omega3: omega3Grams * 1000 }),
     } satisfies LockedNutritionValues,
     totalSugar: sugars,
   };
@@ -363,7 +383,7 @@ function mapProductToNutrition(product: OpenFoodFactsProduct, amount: number) {
 function buildOpenFoodFactsFallback(description: string, match: OpenFoodFactsMatch): AiLogResponse {
   const likelyNaturalSugar = looksLikeNaturalSugarSource(`${description} ${match.values.name ?? ""}`);
 
-  return {
+  return completeMissingNutrition({
     name: typeof match.values.name === "string" && match.values.name.trim()
       ? match.values.name
       : buildFallbackName(description),
@@ -372,14 +392,14 @@ function buildOpenFoodFactsFallback(description: string, match: OpenFoodFactsMat
     protein: match.values.protein ?? 0,
     carbs: match.values.carbs ?? 0,
     fat: match.values.fat ?? 0,
-    satFat: match.values.satFat ?? 0,
-    fibre: match.values.fibre ?? 0,
+    satFat: match.values.satFat,
+    fibre: match.values.fibre,
     addedSugar: likelyNaturalSugar ? 0 : match.totalSugar,
     naturalSugar: likelyNaturalSugar ? match.totalSugar : 0,
-    salt: match.values.salt ?? 0,
-    alcohol: match.values.alcohol ?? 0,
-    omega3: match.values.omega3 ?? 0,
-  };
+    salt: match.values.salt,
+    alcohol: match.values.alcohol,
+    omega3: match.values.omega3,
+  });
 }
 
 function mergeLockedValues(result: AiLogResponse, lockedValues: LockedNutritionValues): AiLogResponse {
@@ -404,20 +424,67 @@ function mergeLockedValues(result: AiLogResponse, lockedValues: LockedNutritionV
 }
 
 function finalizeNutrition(data: AiLogResponse): AiLogResponse {
+  const completed = completeMissingNutrition(data);
   return {
-    ...data,
-    calories: round1(data.calories),
-    protein: round1(data.protein),
-    carbs: round1(data.carbs),
-    fat: round1(data.fat),
-    satFat: round1(data.satFat),
-    fibre: round1(data.fibre),
-    addedSugar: round1(data.addedSugar),
-    naturalSugar: round1(data.naturalSugar),
-    salt: round1(data.salt),
-    alcohol: round1(data.alcohol),
-    omega3: round1(data.omega3),
+    ...completed,
+    calories: round1(completed.calories),
+    protein: round1(completed.protein),
+    carbs: round1(completed.carbs),
+    fat: round1(completed.fat),
+    satFat: round1(completed.satFat),
+    fibre: round1(completed.fibre),
+    addedSugar: round1(completed.addedSugar),
+    naturalSugar: round1(completed.naturalSugar),
+    salt: round1(completed.salt),
+    alcohol: round1(completed.alcohol),
+    omega3: round1(completed.omega3),
   };
+}
+
+function completeMissingNutrition(data: Partial<AiLogResponse> & Pick<AiLogResponse, "name">): AiLogResponse {
+  const calories = safeNumber(data.calories);
+  const protein = safeNumber(data.protein);
+  const carbs = safeNumber(data.carbs);
+  const providedFat = toFiniteNumber(data.fat);
+  const fat = providedFat ?? estimateFatFromCalories(calories, protein, carbs);
+  const providedSatFat = toFiniteNumber(data.satFat);
+  const satFat = providedSatFat ?? estimateSaturatedFat(data.name, fat);
+
+  return {
+    name: data.name,
+    category: null,
+    calories,
+    protein,
+    carbs,
+    fat,
+    satFat,
+    fibre: safeNumber(data.fibre),
+    addedSugar: safeNumber(data.addedSugar),
+    naturalSugar: safeNumber(data.naturalSugar),
+    salt: safeNumber(data.salt),
+    alcohol: safeNumber(data.alcohol),
+    omega3: safeNumber(data.omega3),
+  };
+}
+
+function estimateFatFromCalories(calories: number, protein: number, carbs: number): number {
+  const remainingCalories = calories - protein * 4 - carbs * 4;
+  return Math.max(0, remainingCalories / 9);
+}
+
+function estimateSaturatedFat(name: string, fat: number): number {
+  if (fat <= 0) return 0;
+  const lowered = name.toLowerCase();
+  const ratio = /(cheese|butter|cream|chocolate|salami|sausage|nduja|bacon|pancetta|cake|pastry|pizza)/.test(lowered)
+    ? 0.45
+    : /(fish|salmon|tuna|sardine|mackerel|olive|avocado|nuts|almond|walnut)/.test(lowered)
+      ? 0.18
+      : 0.3;
+  return Math.min(fat, fat * ratio);
+}
+
+function safeNumber(value: unknown): number {
+  return Math.max(0, toFiniteNumber(value) ?? 0);
 }
 
 function hasCoreNutrition(product: OpenFoodFactsProduct): boolean {

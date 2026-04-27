@@ -152,6 +152,67 @@ describe("estimateNutrition", () => {
     expect(createCompletionMock).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-4o" }));
   });
 
+  it("infers missing fat and saturated fat when AI omits them", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ products: [] }),
+    }));
+
+    createCompletionMock.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              name: "Cheese pizza",
+              category: "Dinner",
+              calories: 800,
+              protein: 30,
+              carbs: 90,
+              fibre: 4,
+              addedSugar: 6,
+              naturalSugar: 4,
+              salt: 2.2,
+              alcohol: 0,
+              omega3: 20,
+            }),
+          },
+        },
+      ],
+    });
+
+    const result = await estimateNutrition({ mode: "describe", description: "large cheese pizza", modelTier: "accurate" });
+
+    expect(result.fat).toBe(35.6);
+    expect(result.satFat).toBe(16);
+  });
+
+  it("infers saturated fat for packaged foods when Open Food Facts does not provide it", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 1,
+        product: {
+          product_name: "Chocolate Cake",
+          nutriments: {
+            "energy-kcal_100g": 420,
+            "proteins_100g": 6,
+            "carbohydrates_100g": 55,
+            "fat_100g": 22,
+            "sugars_100g": 35,
+            "salt_100g": 0.5,
+          },
+          serving_quantity: 100,
+        },
+      }),
+    }));
+
+    const result = await estimateNutrition({ mode: "barcode", barcode: "1234567890123", amount: 100, modelTier: "accurate" });
+
+    expect(result.fat).toBe(22);
+    expect(result.satFat).toBe(9.9);
+    expect(createCompletionMock).not.toHaveBeenCalled();
+  });
+
   it("returns an Open Food Facts fallback when AI is unavailable but OFF matched a product", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: true,

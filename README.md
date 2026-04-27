@@ -1,6 +1,6 @@
 # Nutrition Tracker
 
-A full-featured daily nutrition tracking web app built with **Next.js 15**, **TypeScript**, **Prisma**, **PostgreSQL**, and **NextAuth**. Track every meal, monitor macro and micronutrient targets against NHS guidelines, review trends over time, and build a library of meals you eat regularly.
+A full-featured daily nutrition tracking web app built with **Next.js 15**, **TypeScript**, **Prisma**, **PostgreSQL**, and **NextAuth**. Track every meal, monitor macro and micronutrient targets against NHS guidelines, review trends over time, and quickly reuse meals you have logged before.
 
 **[Live Demo →](https://nutritiontracker-production.up.railway.app)**  
 Try it instantly — no sign-up required. Demo mode provides full functionality with sample data.
@@ -12,22 +12,28 @@ Try it instantly — no sign-up required. Demo mode provides full functionality 
 ### Daily Logging
 - Log meals with 11 tracked nutrients: calories, protein, carbs, fat, sat fat, fibre, added sugar, natural sugar, salt, alcohol, and omega-3
 - Hybrid meal autofill: Open Food Facts lookup for packaged foods first, then AI completion/fallback for missing fields and mixed meals
+- AI-assisted entries repair missing nutrient fields such as total fat and saturated fat before filling the form
 - Paste a barcode or product name to autofill packaged foods from Open Food Facts, with optional g/ml override
 - Camera barcode scan inside the Log meal section on supported browsers, with manual paste fallback everywhere else
+- Search previously logged meals and load their nutrition values directly into the add-meal form
 - Per-meal **health-coloured badges** (green / orange / red) based on NHS reference intake guidelines
 - Edit and delete individual meals inline
 - Track daily steps
+- Optionally adjust the calorie target from steps, using about 40 kcal per 1,000 steps
 - Optional phone step sync for signed-in users: iPhone via Apple Health → Shortcuts → secure webhook
 - Collapsible "Log meal" form and "Meals logged" list for a clean interface
 - Navigate between days with arrow buttons or a calendar date picker
 
-### Saved Meal Templates
-- Save any meal as a reusable template
-- Quickly add a saved meal to the current day from a dropdown picker
+### Meal Reuse
+- Search meals already logged in your history and reuse their nutrient values
+- Results are de-duplicated by meal name and show the most recent logged date
+- Saved meal templates are still supported for explicitly curated favourites
 - Delete saved templates you no longer need
 
 ### Goals
 - Customisable daily targets for every tracked nutrient, stored per-user in the database
+- Goal updates are schema-validated before being stored
+- Optional step-based calorie adjustment can be toggled from the goals panel
 - Visual progress bars with colour-coded status (good / approaching / over)
 - Edit goals from both Today and History views
 
@@ -170,6 +176,7 @@ All routes require an active session or a valid demo cookie. Data is scoped to t
 | `POST` | `/api/meals` | Create a meal and recalculate day totals |
 | `PATCH` | `/api/meals/:id` | Update a meal and recalculate day totals |
 | `DELETE` | `/api/meals/:id` | Delete a meal and recalculate day totals |
+| `GET` | `/api/meals/history` | Search distinct previously logged meals for reuse |
 | `GET` | `/api/saved-meals` | List saved meal templates |
 | `POST` | `/api/saved-meals` | Create a saved meal template |
 | `DELETE` | `/api/saved-meals/:id` | Delete a saved meal template |
@@ -187,6 +194,8 @@ All routes require an active session or a valid demo cookie. Data is scoped to t
 - `productSearch` — packaged-food lookup by product name
 - `barcode` — packaged-food lookup by barcode without using AI tokens
 
+The response always matches the meal form shape. If a model or packaged-food source omits optional nutrients, the service fills safe defaults and estimates missing fat/saturated fat where possible.
+
 For model choice, the UI exposes:
 
 - `Default` → `gpt-4o`
@@ -202,7 +211,8 @@ Phone step sync is different: browsers cannot read Apple Health or Health Connec
 
 Configured for [Railway](https://railway.app) via `railway.toml`:
 
-- Prisma client generation + `prisma migrate deploy` run during build
+- Prisma client generation runs during build
+- `prisma migrate deploy` runs as a Railway pre-deploy command
 - `next build` produces the production bundle
 - `npm start -- -p $PORT` starts the server
 

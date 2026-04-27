@@ -114,7 +114,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 7 — Steps → calorie budget adjustment (Medium effort, meaningful UX)
+## ✅ TASK 7 — Steps → calorie budget adjustment (Medium effort, meaningful UX) *(done)*
 
 **Problem:** Steps are tracked but never feed back into the calorie goal. 10 000 steps burn ~400 kcal, so ignoring them makes the calorie bar misleading.
 
@@ -241,7 +241,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 12 — Add Zod validation to `PATCH /api/user/goals` (Bug)
+## ✅ TASK 12 — Add Zod validation to `PATCH /api/user/goals` (Bug) *(done)*
 
 **Problem:** The goals API route accepts arbitrary JSON with no schema validation. A malformed payload could corrupt the stored goals.
 

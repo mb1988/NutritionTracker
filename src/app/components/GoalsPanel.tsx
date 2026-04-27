@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { type DailyGoals, DEFAULT_GOALS } from "@/app/types";
+import { type DailyGoals, DEFAULT_GOALS, type NumericGoalKey } from "@/app/types";
 
 type Props = {
   goals:  DailyGoals;
   onSave: (goals: DailyGoals) => void;
 };
 
-type GoalField = { key: keyof DailyGoals; label: string; unit: string };
+type GoalField = { key: NumericGoalKey; label: string; unit: string };
 
 const GOAL_FIELDS: GoalField[] = [
   { key: "calories",     label: "Calories",      unit: "kcal" },
@@ -42,9 +42,13 @@ export function GoalsPanel({ goals, onSave }: Props) {
     setDraft(DEFAULT_GOALS);
   }
 
-  function setGoal(key: keyof DailyGoals, raw: string) {
+  function setGoal(key: NumericGoalKey, raw: string) {
     const n = parseFloat(raw);
     setDraft((prev) => ({ ...prev, [key]: isNaN(n) || n < 0 ? 0 : n }));
+  }
+
+  function setStepCalorieAdjustment(enabled: boolean) {
+    setDraft((prev) => ({ ...prev, stepCalorieAdjustment: enabled }));
   }
 
   if (!open) {
@@ -83,6 +87,17 @@ export function GoalsPanel({ goals, onSave }: Props) {
           </div>
         ))}
       </div>
+      <label className="goals-panel__toggle">
+        <input
+          type="checkbox"
+          checked={draft.stepCalorieAdjustment}
+          onChange={(event) => setStepCalorieAdjustment(event.target.checked)}
+        />
+        <span>
+          <strong>Adjust calorie target from steps</strong>
+          <small>About 40 kcal per 1,000 steps.</small>
+        </span>
+      </label>
       <div className="goals-panel__actions">
         <button type="button" className="btn-ghost btn-sm" onClick={handleReset}>Reset defaults</button>
         <button type="button" className="btn-primary btn-sm" onClick={handleSave}>Save goals</button>

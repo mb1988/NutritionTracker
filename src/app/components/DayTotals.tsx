@@ -1,6 +1,6 @@
 "use client";
 
-import { type DaySnapshot, type DailyGoals, type MealFormValues } from "@/app/types";
+import { type DaySnapshot, type DailyGoals, type MealFormValues, type NumericGoalKey } from "@/app/types";
 import { GoalsPanel } from "@/app/components/GoalsPanel";
 import { DailyFoodSuggestions } from "@/app/components/DailyFoodSuggestions";
 
@@ -30,9 +30,10 @@ type MacroRowProps = {
   goal:    number;
   unit:    string;
   reverse?: boolean;
+  helperText?: string;
 };
 
-function MacroRow({ label, value, goal, unit, reverse = false }: MacroRowProps) {
+function MacroRow({ label, value, goal, unit, reverse = false, helperText }: MacroRowProps) {
   const ratio        = goal > 0 ? value / goal : 0;
   const isOver       = !reverse && ratio > 1;
   const isApproach   = !reverse && ratio > 0.85 && ratio <= 1;
@@ -73,13 +74,18 @@ function MacroRow({ label, value, goal, unit, reverse = false }: MacroRowProps) 
           transition: "width 0.5s cubic-bezier(0.2,0,0,1)",
         }} />
       </div>
+      {helperText && (
+        <span style={{ fontSize: "0.6875rem", color: "var(--md-primary)", fontWeight: 700 }}>
+          {helperText}
+        </span>
+      )}
     </div>
   );
 }
 
 const MACRO_ROWS: Array<{
   key:     keyof DaySnapshot;
-  goalKey: keyof DailyGoals;
+  goalKey: NumericGoalKey;
   label:   string;
   unit:    string;
   reverse?: boolean;
@@ -103,8 +109,16 @@ function localISODate(): string {
 }
 
 export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave, meals = [], savedMeals = [] }: Props) {
-  const remaining = Math.round(Math.max(0, goals.calories - totals.calories));
-  const isOver    = totals.calories > goals.calories;
+  const steps = totals.steps ?? 0;
+  const earnedCalories = goals.stepCalorieAdjustment && steps > 0
+    ? Math.round(steps * 0.04)
+    : 0;
+  const calorieGoal = goals.calories + earnedCalories;
+  const effectiveGoals = earnedCalories > 0
+    ? { ...goals, calories: calorieGoal }
+    : goals;
+  const remaining = Math.round(Math.max(0, calorieGoal - totals.calories));
+  const isOver    = totals.calories > calorieGoal;
   const isToday   = selectedDate === localISODate();
   const title     = isToday ? "Today’s Progress" : `Progress for ${formatDisplayDate(selectedDate)}`;
 
@@ -117,7 +131,7 @@ export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave,
           <span style={{ fontSize: "0.8125rem", color: "var(--md-on-surface-variant)", marginTop: 4, display: "block" }}>
             {mealCount} meal{mealCount !== 1 ? "s" : ""}&nbsp;·&nbsp;
             {isOver
-              ? <span style={{ color: "var(--md-error)", fontWeight: 700 }}>over by {Math.abs(Math.round(totals.calories - goals.calories))} kcal</span>
+              ? <span style={{ color: "var(--md-error)", fontWeight: 700 }}>over by {Math.abs(Math.round(totals.calories - calorieGoal))} kcal</span>
               : <span style={{ color: "var(--md-primary-container)", fontWeight: 600 }}>{remaining} kcal remaining</span>
             }
           </span>
@@ -128,7 +142,7 @@ export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave,
       {isToday && (
         <DailyFoodSuggestions
           selectedDate={selectedDate}
-          goals={goals}
+          goals={effectiveGoals}
           totals={totals}
           meals={meals}
           savedMeals={savedMeals}
@@ -142,9 +156,14 @@ export function DayTotals({ totals, goals, mealCount, selectedDate, onGoalsSave,
             key={key}
             label={label}
             value={(totals[key] as number) ?? 0}
-            goal={goals[goalKey]}
+            goal={goalKey === "calories" ? calorieGoal : goals[goalKey]}
             unit={unit}
             reverse={reverse}
+            helperText={
+              goalKey === "calories" && earnedCalories > 0
+                ? `+${earnedCalories} kcal from ${steps.toLocaleString()} steps`
+                : undefined
+            }
           />
         ))}
         {/* Steps (no goal, just display if present) */}
