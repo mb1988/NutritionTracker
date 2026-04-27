@@ -51,16 +51,25 @@ export function SavedMealPicker({ savedMeals, onSelect, onDelete }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+  const trimmedQuery = query.trim();
+  const hasActiveSearch = trimmedQuery.length >= 2;
 
   useEffect(() => {
+    if (!hasActiveSearch) {
+      setHistoryMeals([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
       try {
         const params = new URLSearchParams({
-          q: query.trim(),
-          limit: query.trim() ? "20" : "12",
+          q: trimmedQuery,
+          limit: "12",
         });
         const res = await fetch(`/api/meals/history?${params}`, {
           signal: controller.signal,
@@ -81,7 +90,7 @@ export function SavedMealPicker({ savedMeals, onSelect, onDelete }: Props) {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [query]);
+  }, [hasActiveSearch, trimmedQuery]);
 
   const results = useMemo<MealPick[]>(() => {
     const normalized = new Set<string>();
@@ -94,8 +103,8 @@ export function SavedMealPicker({ savedMeals, onSelect, onDelete }: Props) {
     }
 
     const templateMatches = savedMeals.filter((meal) => {
-      const q = query.trim().toLowerCase();
-      if (!q) return true;
+      const q = trimmedQuery.toLowerCase();
+      if (!q) return false;
       return meal.name.toLowerCase().includes(q);
     });
 
@@ -106,7 +115,7 @@ export function SavedMealPicker({ savedMeals, onSelect, onDelete }: Props) {
     }
 
     return picks.slice(0, 24);
-  }, [historyMeals, query, savedMeals]);
+  }, [historyMeals, savedMeals, trimmedQuery]);
 
   return (
     <div className="saved-meal-picker">
@@ -138,7 +147,9 @@ export function SavedMealPicker({ savedMeals, onSelect, onDelete }: Props) {
       {error && <div className="alert-error">{error}</div>}
 
       <div className="saved-meal-picker__results">
-        {loading && results.length === 0 ? (
+        {!hasActiveSearch ? (
+          <div className="saved-meal-picker__empty">Type at least 2 letters to search your past meals.</div>
+        ) : loading && results.length === 0 ? (
           <div className="saved-meal-picker__empty">Searching...</div>
         ) : results.length === 0 ? (
           <div className="saved-meal-picker__empty">No matching past meals yet.</div>
