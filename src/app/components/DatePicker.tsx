@@ -80,7 +80,6 @@ export function DatePicker({ date, steps, stepSource, stepsSyncedAt, stepSyncEna
           className="btn-ghost btn-sm"
           onClick={() => handleDateChange(offsetDate(date, 1))}
           title="Next day"
-          disabled={isToday}
           style={{ padding: "var(--space-1) var(--space-2)", fontSize: "1rem", flexShrink: 0 }}
         >
           ›
@@ -123,7 +122,6 @@ export function DatePicker({ date, steps, stepSource, stepsSyncedAt, stepSyncEna
       <input
         type="date"
         value={date}
-        max={today}
         onChange={(e) => handleDateChange(e.target.value)}
         className="date-picker__input"
       />

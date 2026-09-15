@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { type MealFormValues, type SelectableMetricKey, type DailyGoals } from "@/app/types";
 import { useNutritionData, type ApiDay, type ApiMeal } from "@/app/hooks/useNutritionData";
@@ -383,6 +383,9 @@ function PageSkeleton() {
 // ── Main Page ─────────────────────────────────────────────────
 type Tab = "today" | "trend" | "history" | "connect-step";
 
+/** History renders this many day cards at a time (the demo has a year of them). */
+const HISTORY_PAGE_SIZE = 60;
+
 export default function HomePage() {
   const { data: session, status: sessionStatus } = useSession();
   const isDemo = sessionStatus !== "loading" && !session;
@@ -394,6 +397,7 @@ export default function HomePage() {
   const [timePeriod,     setTimePeriod]     = useState<TimePeriod>("1week");
   const [editScrollRequest, setEditScrollRequest] = useState(0);
   const [resettingDemo,  setResettingDemo]  = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(HISTORY_PAGE_SIZE);
   const mealFormRef = useRef<HTMLDivElement | null>(null);
 
   const { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, mergeMeals, updateSteps, refreshAll } =
@@ -424,6 +428,15 @@ export default function HomePage() {
   }, [refreshAll]);
 
   const totals = apiDayToSnapshot(selectedDay ?? null);
+
+  // "History" only lists logged days up to today. The demo dataset also carries
+  // days in the future (reachable with the date picker), and rendering a
+  // thousand cards at once would be pointless work.
+  const historyDays = useMemo(
+    () => allDays.filter((day) => day.date <= todayISO()),
+    [allDays],
+  );
+  const visibleHistoryDays = historyDays.slice(0, historyVisible);
 
   const handleAdd = useCallback(
     (values: MealFormValues) => addMeal(selectedDate, values),
@@ -749,9 +762,9 @@ export default function HomePage() {
         ) : (
           <div>
             <div className="section-label" style={{ marginBottom: "var(--space-3)" }}>
-              All Logged Days ({allDays.length})
+              All Logged Days ({historyDays.length})
             </div>
-            {allDays.length === 0 ? (
+            {historyDays.length === 0 ? (
               <div className="card" style={{ padding: "var(--space-12)", textAlign: "center" }}>
                 <div style={{ fontSize: "3rem", marginBottom: "var(--space-3)" }}>📅</div>
                 <p style={{ fontWeight: 700, marginBottom: 6 }}>No days logged yet</p>
@@ -761,9 +774,19 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="stack" style={{ gap: "var(--space-3)" }}>
-                {allDays.map((d) => (
+                {visibleHistoryDays.map((d) => (
                   <DayCard key={d.date} day={d} goals={goals} onClick={() => navigateToHistoryDate(d.date)} />
                 ))}
+                {historyDays.length > visibleHistoryDays.length && (
+                  <button
+                    type="button"
+                    className="btn-tonal btn-sm"
+                    onClick={() => setHistoryVisible((count) => count + HISTORY_PAGE_SIZE)}
+                    style={{ justifySelf: "center" }}
+                  >
+                    Load more days ({historyDays.length - visibleHistoryDays.length} remaining)
+                  </button>
+                )}
               </div>
             )}
           </div>

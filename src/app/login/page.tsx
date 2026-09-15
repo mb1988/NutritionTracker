@@ -143,7 +143,7 @@ export default function LoginPage() {
           marginTop: "var(--space-6)",
           opacity: 0.6,
         }}>
-          Demo loads 12 days of sample data you can explore and edit.
+          Demo loads over a year of sample data you can explore and edit.
         </p>
       </div>
     </div>

@@ -54,6 +54,7 @@ Try it instantly — no sign-up required. Demo mode provides full functionality 
 ### Demo Mode
 - Anonymous demo experience — no login required
 - Full feature parity: log meals, edit goals, browse history, view trends
+- Seeded with a year of history and a year of future dates, so the demo is never empty
 - One-click data reset to restore sample data
 - Ideal for showcasing the app on a portfolio or résumé
 
@@ -217,6 +218,19 @@ Configured for [Railway](https://railway.app) via `railway.toml`:
 - `npm start -- -p $PORT` starts the server
 
 Provision a PostgreSQL plugin in Railway, set the environment variables, and deploy.
+
+### Railway free plan notes
+
+The project runs on Railway's Free plan, which shapes how it is operated:
+
+- **Services must sleep when idle.** Free-plan services are required to have Serverless (formerly App Sleeping) enabled. The first request after a quiet period pays a cold start, and can occasionally return a 502 once - refresh and it loads.
+- **Deploys are blocked during regional peak hours** (8 AM - 8 PM in the region's local timezone). The services run in EU West (Amsterdam, `europe-west4-drams3a`), so deploys are accepted between 19:00 and 07:00 UK time. Pick a region whose off-peak window suits you.
+- **$1 of credit per month** comfortably covers a sleeping app plus a sleeping Postgres. Leaving either service awake 24/7 does not fit the free allowance.
+- `DATABASE_URL` on the app service is set to `${{Postgres.DATABASE_URL}}`, so it uses the in-project private network address and stays in sync with the database.
+
+### Demo dataset
+
+`src/lib/demoDataset.ts` generates the shared demo user's data relative to "today" whenever the demo is seeded (`POST /api/demo/reset`, the "Try Demo" button, or `npx prisma db seed` for a test user). It writes the recent two weeks by hand, then generates every remaining day, so the demo always opens on a full day of meals with a year of history and a year of future dates behind it.
 
 ---
 
