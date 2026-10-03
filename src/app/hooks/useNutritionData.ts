@@ -208,30 +208,30 @@ export function useNutritionData(activeDate: string): UseNutritionData {
     }
   }, [refreshDay]);
 
-  const updateSteps = useCallback(async (date: string, steps: number) => {
-    await requestOk("/api/days", {
+  /**
+   * PATCH /api/days returns the updated day with its meals, so the response
+   * is applied directly instead of re-fetching the day.
+   */
+  const patchDay = useCallback(async (body: { date: string; steps?: number; waterMl?: number }) => {
+    const res = await requestOk("/api/days", {
       method: "PATCH",
       headers: HEADERS,
-      body: JSON.stringify({ date, steps }),
+      body: JSON.stringify(body),
     });
-    await refreshDay(date);
-  }, [refreshDay]);
+    const { day } = await res.json() as { day: ApiDay };
+    if (body.date === activeDateRef.current) setSelectedDay(day);
+    setAllDays((prev) => upsertSummary(prev, body.date, day));
+  }, []);
 
-  const updateWater = useCallback(async (date: string, waterMl: number) => {
-    // Optimistic: water taps should feel instant.
-    if (date === activeDateRef.current) {
-      setSelectedDay((day) => (day ? { ...day, totalWaterMl: waterMl } : day));
-    }
-    try {
-      await requestOk("/api/days", {
-        method: "PATCH",
-        headers: HEADERS,
-        body: JSON.stringify({ date, waterMl }),
-      });
-    } finally {
-      await refreshDay(date);
-    }
-  }, [refreshDay]);
+  const updateSteps = useCallback(
+    (date: string, steps: number) => patchDay({ date, steps }),
+    [patchDay],
+  );
+
+  const updateWater = useCallback(
+    (date: string, waterMl: number) => patchDay({ date, waterMl }),
+    [patchDay],
+  );
 
   return {
     selectedDay,

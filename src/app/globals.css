@@ -1873,3 +1873,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Instant visual feedback when a glass is tapped. */
+.water-glass svg path { transition: fill-opacity 120ms ease, stroke 120ms ease; }
+.water-glass:active:not(:disabled) { transform: scale(0.88); }

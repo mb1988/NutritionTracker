@@ -221,7 +221,8 @@ export function DayTotals({
       {/* Activity */}
       <div className="day-totals__activity">
         <StepsInput steps={steps} stepSource={stepSource} stepsSyncedAt={stepsSyncedAt} onSave={onStepsSave} />
-        <WaterTracker waterMl={waterMl} goalMl={goals.waterGoal} onChange={onWaterChange} />
+        {/* Keyed by date so unsaved taps flush against the day they were made on. */}
+        <WaterTracker key={selectedDate} waterMl={waterMl} goalMl={goals.waterGoal} onChange={onWaterChange} />
       </div>
 
       {isToday && (
