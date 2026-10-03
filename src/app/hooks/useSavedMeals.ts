@@ -79,6 +79,7 @@ export function useSavedMeals() {
       });
     } catch (e) {
       console.error("Failed to save template:", e);
+      throw new Error("Could not save the template. Please try again.");
     }
   }, [savedMeals]);
 

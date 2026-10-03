@@ -29,25 +29,24 @@ export function getAggregationType(period: TimePeriod): AggregationType {
   }
 }
 
-export function getDateRangeForPeriod(period: TimePeriod): string[] {
-  const days: string[] = [];
-  const endDate = new Date();
-  const startDate = new Date();
+const PERIOD_DAYS: Record<TimePeriod, number> = {
+  "1week": 7,
+  "1month": 30,
+  "3months": 90,
+  "6months": 180,
+};
 
-  switch (period) {
-    case "1week":
-      startDate.setDate(endDate.getDate() - 6);
-      break;
-    case "1month":
-      startDate.setDate(endDate.getDate() - 29);
-      break;
-    case "3months":
-      startDate.setDate(endDate.getDate() - 89);
-      break;
-    case "6months":
-      startDate.setDate(endDate.getDate() - 179);
-      break;
-  }
+/**
+ * Every date in the period ending today. `periodsBack` shifts the window into
+ * the past by whole periods (1 = the period just before this one).
+ */
+export function getDateRangeForPeriod(period: TimePeriod, periodsBack = 0): string[] {
+  const days: string[] = [];
+  const length = PERIOD_DAYS[period];
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() - length * periodsBack);
+  const startDate = new Date(endDate);
+  startDate.setDate(endDate.getDate() - (length - 1));
 
   const current = new Date(startDate);
   while (current <= endDate) {
@@ -59,19 +58,6 @@ export function getDateRangeForPeriod(period: TimePeriod): string[] {
   }
 
   return days;
-}
-
-export function getPeriodLabel(period: TimePeriod): string {
-  switch (period) {
-    case "1week":
-      return "7-Day";
-    case "1month":
-      return "Monthly";
-    case "3months":
-      return "Quarterly";
-    case "6months":
-      return "6-Month";
-  }
 }
 
 /** Get week number for aggregation (1-4 for month, 1-26 for 6 months) */
@@ -95,7 +81,7 @@ export type AggregatedDay = {
   label: string; // e.g. "Mon", "Week 1", "Jan"
   value: number;
   date: string; // Representative date for this aggregation (for clicking)
-  count: number; // Number of days in this aggregation
+  count: number; // Number of logged days in this aggregation
 };
 
 export function aggregateData(
@@ -112,7 +98,7 @@ export function aggregateData(
       label: new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short" }),
       value: byDate.get(date) ? Number((byDate.get(date) as Record<string, unknown>)[metricKey] ?? 0) : 0,
       date,
-      count: 1,
+      count: byDate.has(date) ? 1 : 0,
     }));
   }
 
@@ -121,7 +107,6 @@ export function aggregateData(
 
   for (const date of days) {
     const day = byDate.get(date);
-    const value = day ? Number((day as Record<string, unknown>)[metricKey] ?? 0) : 0;
 
     let key: number;
     if (aggregation === "weekly") {
@@ -134,9 +119,13 @@ export function aggregateData(
       aggregated.set(key, { sum: 0, count: 0, lastDate: date });
     }
 
+    // Average over logged days only, matching the metric tiles — unlogged days
+    // are missing data, not zero intake.
     const current = aggregated.get(key)!;
-    current.sum += value;
-    current.count += 1;
+    if (day) {
+      current.sum += Number((day as Record<string, unknown>)[metricKey] ?? 0);
+      current.count += 1;
+    }
     current.lastDate = date;
   }
 

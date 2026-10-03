@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { type LocalMeal } from "@/app/types";
 import { MacroBadge } from "@/app/components/MacroBadge";
 import { getNutrientStatus } from "@/app/components/nutrientStatus";
@@ -7,7 +8,7 @@ import { getNutrientStatus } from "@/app/components/nutrientStatus";
 type Props = {
   meal: LocalMeal;
   onEdit: (meal: LocalMeal) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<void> | void;
   mergeMode?: boolean;
   selected?: boolean;
   onSelect?: (id: string) => void;
@@ -21,11 +22,37 @@ const CATEGORY_ICONS: Record<string, string> = {
   Other:     "☕",
 };
 
+/** How long the "Delete?" confirmation stays up before quietly cancelling. */
+const CONFIRM_TIMEOUT_MS = 6000;
+
 export function MealItem({ meal, onEdit, onDelete, mergeMode, selected, onSelect }: Props) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!confirmingDelete) return;
+    const timer = window.setTimeout(() => setConfirmingDelete(false), CONFIRM_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [confirmingDelete]);
+
+  async function confirmDelete() {
+    setDeleting(true);
+    try {
+      await onDelete(meal.id);
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
+
   return (
     <div
       className={`meal-item${mergeMode && selected ? " meal-item--selected" : ""}`}
       onClick={mergeMode ? () => onSelect?.(meal.id) : undefined}
+      onKeyDown={mergeMode ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect?.(meal.id); } } : undefined}
+      role={mergeMode ? "checkbox" : undefined}
+      aria-checked={mergeMode ? Boolean(selected) : undefined}
+      tabIndex={mergeMode ? 0 : undefined}
       style={mergeMode ? { cursor: "pointer" } : undefined}
     >
       <div className="meal-item__body">
@@ -84,9 +111,30 @@ export function MealItem({ meal, onEdit, onDelete, mergeMode, selected, onSelect
           >
             {selected && <span style={{ color: "var(--md-on-primary)", fontSize: "0.75rem", fontWeight: 900 }}>✓</span>}
           </div>
+        ) : confirmingDelete ? (
+          <div className="meal-item__confirm">
+            <button
+              type="button"
+              className="btn-danger btn-xs"
+              onClick={() => void confirmDelete()}
+              disabled={deleting}
+              aria-label={`Confirm delete ${meal.name}`}
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+            <button
+              type="button"
+              className="btn-ghost btn-xs"
+              onClick={() => setConfirmingDelete(false)}
+              disabled={deleting}
+            >
+              Keep
+            </button>
+          </div>
         ) : (
           <>
             <button
+              type="button"
               className="btn-ghost btn-sm"
               onClick={() => onEdit(meal)}
               aria-label={`Edit ${meal.name}`}
@@ -95,8 +143,9 @@ export function MealItem({ meal, onEdit, onDelete, mergeMode, selected, onSelect
               ✏️
             </button>
             <button
+              type="button"
               className="btn-danger-ghost btn-sm"
-              onClick={() => onDelete(meal.id)}
+              onClick={() => setConfirmingDelete(true)}
               aria-label={`Delete ${meal.name}`}
               title="Delete meal"
             >
