@@ -2,7 +2,7 @@
 
 A full-featured daily nutrition tracking web app built with **Next.js 15**, **TypeScript**, **Prisma**, **PostgreSQL**, and **NextAuth**. Track every meal, monitor macro and micronutrient targets against NHS guidelines, review trends over time, and quickly reuse meals you have logged before.
 
-**[Live Demo →](https://nutritiontracker-production.up.railway.app)**  
+**[Live Demo →](https://nutritiontracker-production-5b2e.up.railway.app)**  
 Try it instantly — no sign-up required. Demo mode provides full functionality with sample data.
 
 ---
@@ -232,6 +232,7 @@ Configured for [Railway](https://railway.app) via `railway.toml`:
 - `prisma migrate deploy` runs as a Railway pre-deploy command
 - `next build` produces the production bundle
 - `npm start -- -p $PORT` starts the server
+- Node 22 is pinned via `engines` in `package.json` (Nixpacks reads it; some dependencies need Node 20+)
 
 Provision a PostgreSQL plugin in Railway, set the environment variables, and deploy.
 
