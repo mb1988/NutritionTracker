@@ -23,6 +23,7 @@ model User {
   days               Day[]
   meals              Meal[]
   savedMeals         SavedMeal[]
+  weightEntries      WeightEntry[]
 
   @@index([createdAt])
 }
@@ -45,6 +46,7 @@ model Day {
   stepsSyncedAt     DateTime?
   totalAlcohol      Float    @default(0)
   totalOmega3       Float    @default(0)
+  totalWaterMl      Int      @default(0)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -105,4 +107,17 @@ model SavedMeal {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+model WeightEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // YYYY-MM-DD
+  weightKg  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
 }

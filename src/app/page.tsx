@@ -1,410 +1,104 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, type ReactNode } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { type MealFormValues, type SelectableMetricKey, type DailyGoals } from "@/app/types";
-import { useNutritionData, type ApiDay, type ApiMeal } from "@/app/hooks/useNutritionData";
+import { type SelectableMetricKey } from "@/app/types";
+import { useNutritionData } from "@/app/hooks/useNutritionData";
 import { useGoals }      from "@/app/hooks/useGoals";
 import { useSavedMeals } from "@/app/hooks/useSavedMeals";
-import { DatePicker }    from "@/app/components/DatePicker";
-import { DayTotals }     from "@/app/components/DayTotals";
-import { MealForm }      from "@/app/components/MealForm";
-import { MealList }      from "@/app/components/MealList";
+import { DayView }       from "@/app/components/DayView";
+import { HistoryList }   from "@/app/components/HistoryList";
 import { MetricSelector } from "@/app/components/MetricSelector";
 import { StepSyncPanel } from "@/app/components/StepSyncPanel";
 import { WeeklyChart }   from "@/app/components/WeeklyChart";
+import { WeightPanel }   from "@/app/components/WeightPanel";
 import { TimePeriodSelector, type TimePeriod } from "@/app/components/TimePeriodSelector";
+import { localISODate } from "@/app/lib/dates";
+import { computeStreak } from "@/app/lib/streak";
 import { DEMO_COOKIE } from "@/lib/demo";
-
-// ── Targets (order matches DayTotals rows) ────────────────────
-const TARGETS = {
-  calories:     { label: "Calories",      unit: "kcal", target: 2200, reverse: false },
-  protein:      { label: "Protein",       unit: "g",    target: 100,  reverse: true  },
-  carbs:        { label: "Carbs",         unit: "g",    target: 250,  reverse: false },
-  fat:          { label: "Total Fat",     unit: "g",    target: 70,   reverse: false },
-  satFat:       { label: "Sat Fat",       unit: "g",    target: 20,   reverse: false },
-  addedSugar:   { label: "Added Sugar",   unit: "g",    target: 25,   reverse: false },
-  naturalSugar: { label: "Natural Sugar", unit: "g",    target: 35,   reverse: false },
-  fibre:        { label: "Fibre",         unit: "g",    target: 28,   reverse: true  },
-  salt:         { label: "Salt",          unit: "g",    target: 6,    reverse: false },
-  alcohol:      { label: "Alcohol",       unit: "u",    target: 2,    reverse: false },
-  omega3:       { label: "Omega-3",       unit: "mg",   target: 250,  reverse: true  },
-} as const;
-
-type TargetKey = keyof typeof TARGETS;
-
-// ── Helpers ───────────────────────────────────────────────────
-function localISODate(d: Date = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function todayISO() {
-  return localISODate();
-}
-
-function formatDate(iso: string) {
-  return new Date(iso + "T12:00:00").toLocaleDateString("en-GB", {
-    weekday: "short", day: "numeric", month: "short",
-  });
-}
-
-function formatStepSyncText(stepSource?: string | null, stepsSyncedAt?: string | null) {
-  const isSynced = stepSource === "ios-shortcuts" || stepSource === "android-health-connect";
-  if (!isSynced) return null;
-
-  const providerLabel = stepSource === "ios-shortcuts" ? "iPhone" : "Android";
-  if (!stepsSyncedAt) return `Auto-synced from ${providerLabel}`;
-
-  const syncedAt = new Date(stepsSyncedAt);
-  const formatted = Number.isNaN(syncedAt.getTime())
-    ? null
-    : syncedAt.toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-  return formatted ? `Auto-synced from ${providerLabel} · ${formatted}` : `Auto-synced from ${providerLabel}`;
-}
-
-function getColor(value: number, target: number, reverse: boolean) {
-  const pct = value / target;
-  if (reverse) return pct >= 1 ? "var(--status-good)" : pct >= 0.8 ? "var(--status-warn)" : "var(--status-over)";
-  return pct <= 0.75 ? "var(--status-good)" : pct <= 1 ? "var(--status-warn)" : "var(--status-over)";
-}
-
-function getDayScore(day: ApiDay, goals: DailyGoals) {
-  let good = 0;
-  if (day.totalCalories <= goals.calories)   good++;
-  if (day.totalAddedSugar <= goals.addedSugar) good++;
-  if (day.totalSatFat <= goals.satFat)       good++;
-  if (day.totalFibre >= goals.fibre)         good++;
-  if (day.totalProtein >= goals.protein)     good++;
-  return good;
-}
-
-function scoreInfo(score: number): { emoji: string; label: string; cls: string } {
-  if (score >= 4) return { emoji: "🟢", label: "Great day", cls: "score-chip--green" };
-  if (score >= 3) return { emoji: "🟡", label: "Decent day", cls: "score-chip--yellow" };
-  return { emoji: "🔴", label: "Needs work", cls: "score-chip--red" };
-}
-
-// ── Sub-components ────────────────────────────────────────────
-
-/** Convert ApiDay to the flat DaySnapshot shape used by DayTotals */
-function apiDayToSnapshot(day: ApiDay | null) {
-  if (!day) return {
-    calories: 0, protein: 0, carbs: 0, fat: 0, satFat: 0, fibre: 0,
-    addedSugar: 0, naturalSugar: 0, salt: 0, alcohol: 0, omega3: 0, steps: 0,
-  };
-  return {
-    calories:     day.totalCalories,
-    protein:      day.totalProtein,
-    carbs:        day.totalCarbs,
-    fat:          day.totalFat,
-    satFat:       day.totalSatFat,
-    fibre:        day.totalFibre,
-    addedSugar:   day.totalAddedSugar,
-    naturalSugar: day.totalNaturalSugar,
-    salt:         day.totalSalt,
-    alcohol:      day.totalAlcohol,
-    omega3:       day.totalOmega3,
-    steps:        day.totalSteps,
-  };
-}
-
-function DayCard({ day, goals, onClick }: { day: ApiDay; goals: DailyGoals; onClick: () => void }) {
-  const score = getDayScore(day, goals);
-  const { emoji, label, cls } = scoreInfo(score);
-  return (
-    <div
-      onClick={onClick}
-      className="card"
-      style={{
-        padding: "var(--space-5) var(--space-6)",
-        cursor: "pointer",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        transition: "background var(--transition), transform var(--transition)",
-        background: "var(--md-surface-container)",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.background = "var(--md-surface-container-high)";
-        (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.background = "var(--md-surface-container)";
-        (e.currentTarget as HTMLElement).style.transform = "none";
-      }}
-    >
-      <div>
-        <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.02em" }}>{formatDate(day.date)}</div>
-        <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 4, lineHeight: 1.5 }}>
-          {Math.round(day.totalCalories)} kcal &nbsp;·&nbsp;
-          P {Math.round(day.totalProtein)}g &nbsp;·&nbsp;
-          C {Math.round(day.totalCarbs)}g &nbsp;·&nbsp;
-          F {Math.round(day.totalFat)}g
-        </div>
-        <div style={{ display: "flex", gap: 4, marginTop: 10 }}>
-          {(Object.keys(TARGETS) as TargetKey[]).slice(0, 5).map((k) => {
-            const t = TARGETS[k];
-            const val = day[`total${k.charAt(0).toUpperCase() + k.slice(1)}` as keyof ApiDay] as number ?? 0;
-            const pct = Math.min((val / t.target) * 100, 100);
-            const color = getColor(val, t.target, t.reverse);
-            return (
-              <div key={k} style={{ height: 5, width: 32, background: "rgba(255,255,255,0.08)", borderRadius: 99, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99 }} />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-        <span className={`score-chip ${cls}`}>{emoji} {label}</span>
-        <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontWeight: 600 }}>{day.meals.length} meals</span>
-      </div>
-    </div>
-  );
-}
-
-function DayDetail({ day, date, goals, onGoalsSave, onBack, onDateChange, onAddMeal, onUpdateMeal, onDeleteMeal, onMergeMeals, onStepsSave, savedMeals, onSaveTemplate, onDeleteSaved }: {
-  day: ApiDay | null;
-  date: string;
-  goals: Parameters<typeof DayTotals>[0]["goals"];
-  onGoalsSave: Parameters<typeof DayTotals>[0]["onGoalsSave"];
-  onBack: () => void;
-  onDateChange: (date: string) => void;
-  onAddMeal: (date: string, values: MealFormValues) => Promise<void>;
-  onUpdateMeal: (mealId: string, values: MealFormValues, date: string) => Promise<void>;
-  onDeleteMeal: (mealId: string, date: string) => Promise<void>;
-  onMergeMeals: (date: string, values: MealFormValues, mealIdsToDelete: string[]) => Promise<void>;
-  onStepsSave: (date: string, steps: number) => Promise<void>;
-  savedMeals: ReturnType<typeof useSavedMeals>["savedMeals"];
-  onSaveTemplate: (values: MealFormValues) => Promise<void>;
-  onDeleteSaved: (id: string) => Promise<void>;
-}) {
-  const [editingMeal, setEditingMeal] = useState<ApiMeal | null>(null);
-  const [draftSteps, setDraftSteps] = useState("");
-  const [stepsSaved, setStepsSaved] = useState(false);
-  const formRef = useRef<HTMLDivElement | null>(null);
-
-  // Clear edit state + steps draft when navigating to a different day
-  useEffect(() => {
-    setEditingMeal(null);
-    setDraftSteps("");
-  }, [date]);
-
-  // Scroll to form when editing starts
-  useEffect(() => {
-    if (!editingMeal) return;
-    const raf = requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [editingMeal]);
-
-  const today = localISODate();
-  const isToday = date === today;
-
-  function offsetDate(iso: string, delta: number): string {
-    const d = new Date(`${iso}T00:00:00`);
-    d.setDate(d.getDate() + delta);
-    return localISODate(d);
-  }
-
-  function handleStepsSubmit() {
-    const n = parseInt(draftSteps, 10);
-    const val = isNaN(n) || n < 0 ? 0 : n;
-    onStepsSave(date, val);
-    setStepsSaved(true);
-    setTimeout(() => setStepsSaved(false), 1500);
-  }
-
-  const currentSteps = day?.totalSteps ?? 0;
-  const displaySteps = draftSteps !== "" ? draftSteps : currentSteps > 0 ? String(currentSteps) : "";
-  const stepSyncText = formatStepSyncText(day?.stepsSource, day?.stepsSyncedAt);
-
-  return (
-    <div className="stack" style={{ gap: "var(--space-5)" }}>
-      <button onClick={onBack} className="btn-ghost btn-sm" style={{ width: "fit-content", paddingLeft: 0 }}>
-        ← Back to history
-      </button>
-
-      {/* Date navigation */}
-      <div className="card date-picker" style={{ flexWrap: "wrap", gap: "var(--space-3)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flex: 1, minWidth: 200 }}>
-          <button
-            type="button"
-            className="btn-ghost btn-sm"
-            onClick={() => onDateChange(offsetDate(date, -1))}
-            title="Previous day"
-            style={{ padding: "var(--space-1) var(--space-2)", fontSize: "1rem", flexShrink: 0 }}
-          >
-            ‹
-          </button>
-          <div className="date-picker__info" style={{ flex: 1, textAlign: "center" }}>
-            <span className="date-picker__eyebrow">Viewing</span>
-            <span className="date-picker__value">
-              {new Date(`${date}T00:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="btn-ghost btn-sm"
-            onClick={() => onDateChange(offsetDate(date, 1))}
-            title="Next day"
-            disabled={isToday}
-            style={{ padding: "var(--space-1) var(--space-2)", fontSize: "1rem", flexShrink: 0 }}
-          >
-            ›
-          </button>
-        </div>
-
-        {/* Steps */}
-        <div style={{ display: "grid", gap: 4 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
-              👟 Steps
-            </span>
-            <input
-              type="number"
-              min={0}
-              max={100000}
-              step={500}
-              placeholder="0"
-              value={displaySteps}
-              onChange={(e) => setDraftSteps(e.target.value)}
-              onBlur={handleStepsSubmit}
-              onKeyDown={(e) => e.key === "Enter" && handleStepsSubmit()}
-              style={{ width: 90, textAlign: "right" }}
-              className="date-picker__input"
-              aria-label="Daily steps"
-            />
-            {stepsSaved && (
-              <span style={{ fontSize: "0.75rem", color: "var(--md-primary-container)", fontWeight: 700 }}>✓</span>
-            )}
-          </div>
-          {stepSyncText && (
-            <span style={{ fontSize: "0.6875rem", color: "var(--md-primary)", fontWeight: 600 }}>
-              {stepSyncText}
-            </span>
-          )}
-        </div>
-
-        {/* Calendar input */}
-        <input
-          type="date"
-          value={date}
-          max={today}
-          onChange={(e) => {
-            if (e.target.value) {
-              onDateChange(e.target.value);
-            }
-          }}
-          className="date-picker__input"
-        />
-      </div>
-
-      {/* Day summary — reuses the same DayTotals component as Today */}
-      <DayTotals
-        totals={apiDayToSnapshot(day)}
-        goals={goals}
-        mealCount={day?.meals.length ?? 0}
-        selectedDate={date}
-        onGoalsSave={onGoalsSave}
-        meals={(day?.meals ?? []).map(({ id: _id, createdAt: _createdAt, ...meal }) => meal)}
-        savedMeals={savedMeals.map(({ id: _id, ...meal }) => meal)}
-      />
-
-      {/* Meals list with consistent MealItem display */}
-      <MealList
-        meals={(day?.meals ?? []).map((m) => ({ ...m, date }))}
-        onEdit={(meal) => setEditingMeal(meal as ApiMeal)}
-        onDelete={(id) => onDeleteMeal(id, date)}
-        onMerge={async (merged, ids) => {
-          await onMergeMeals(date, merged, ids);
-        }}
-      />
-
-      {/* Add / edit meal form — with saved meal templates */}
-      <div ref={formRef} style={{ scrollMarginTop: "var(--space-6)" }}>
-        {editingMeal ? (
-          <MealForm
-            key={editingMeal.id}
-            initialValues={{
-              name: editingMeal.name, category: editingMeal.category,
-              calories: editingMeal.calories,
-              protein: editingMeal.protein, carbs: editingMeal.carbs,
-              fat: editingMeal.fat, satFat: editingMeal.satFat,
-              fibre: editingMeal.fibre, addedSugar: editingMeal.addedSugar,
-              naturalSugar: editingMeal.naturalSugar, salt: editingMeal.salt,
-              alcohol: editingMeal.alcohol ?? 0,
-              omega3: editingMeal.omega3 ?? 0,
-            }}
-            onSubmit={async (values) => { await onUpdateMeal(editingMeal.id, values, date); setEditingMeal(null); }}
-            onCancel={() => setEditingMeal(null)}
-            onSaveTemplate={onSaveTemplate}
-          />
-        ) : (
-          <MealForm
-            onSubmit={(values) => onAddMeal(date, values)}
-            savedMeals={savedMeals}
-            onSaveTemplate={onSaveTemplate}
-            onDeleteSaved={onDeleteSaved}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Loading Skeleton ──────────────────────────────────────────
 function PageSkeleton() {
   return (
-    <div className="page-wrapper">
+    <div className="page-wrapper" aria-busy="true">
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <div className="skeleton" style={{ width: 32, height: 32, borderRadius: 8 }} />
-        <div className="skeleton" style={{ width: 180, height: 28, borderRadius: 8 }} />
+        <div className="skeleton" style={{ width: 40, height: 40, borderRadius: 12 }} />
+        <div className="skeleton" style={{ width: 160, height: 28, borderRadius: 8 }} />
       </div>
-      <div className="skeleton" style={{ width: 180, height: 40, borderRadius: 99, marginBottom: 24 }} />
-      <div className="skeleton" style={{ height: 72, borderRadius: 24, marginBottom: 20 }} />
-      <div className="skeleton" style={{ height: 260, borderRadius: 24, marginBottom: 20 }} />
-      <div className="skeleton" style={{ height: 200, borderRadius: 24, marginBottom: 20 }} />
-      <div className="skeleton" style={{ height: 320, borderRadius: 24 }} />
+      <div className="skeleton" style={{ height: 48, borderRadius: 28, marginBottom: 24 }} />
+      <div className="skeleton" style={{ height: 72, borderRadius: 36, marginBottom: 20 }} />
+      <div className="skeleton" style={{ height: 300, borderRadius: 36, marginBottom: 20 }} />
+      <div className="skeleton" style={{ height: 72, borderRadius: 36 }} />
     </div>
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────
+// ── Tabs ──────────────────────────────────────────────────────
 type Tab = "today" | "trend" | "history" | "connect-step";
 
-/** History renders this many day cards at a time (the demo has a year of them). */
-const HISTORY_PAGE_SIZE = 60;
+const TAB_ICONS: Record<Tab, ReactNode> = {
+  today: (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+  ),
+  trend: (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3.5-4 3 2.5L19 8" /></svg>
+  ),
+  history: (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
+  ),
+  "connect-step": (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></svg>
+  ),
+};
 
+const TAB_LABELS: Record<Tab, string> = {
+  today: "Today",
+  trend: "Trends",
+  history: "History",
+  "connect-step": "Connect",
+};
+
+// ── Main Page ─────────────────────────────────────────────────
 export default function HomePage() {
   const { data: session, status: sessionStatus } = useSession();
+  const isSignedIn = Boolean(session?.user);
   const isDemo = sessionStatus !== "loading" && !session;
   const [tab,            setTab]            = useState<Tab>("today");
-  const [selectedDate,   setSelectedDate]   = useState(todayISO());
   const [historyDate,    setHistoryDate]    = useState<string | null>(null);
-  const [editingMeal,    setEditingMeal]    = useState<ApiMeal | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<SelectableMetricKey>("calories");
   const [timePeriod,     setTimePeriod]     = useState<TimePeriod>("1week");
-  const [editScrollRequest, setEditScrollRequest] = useState(0);
   const [resettingDemo,  setResettingDemo]  = useState(false);
-  const [historyVisible, setHistoryVisible] = useState(HISTORY_PAGE_SIZE);
-  const mealFormRef = useRef<HTMLDivElement | null>(null);
+  const [demoError,      setDemoError]      = useState<string | null>(null);
 
-  const { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, mergeMeals, updateSteps, refreshAll } =
-    useNutritionData(selectedDate);
+  const today = localISODate();
+  // The Today tab always shows today; History shows whichever day was opened.
+  const activeDate = tab === "history" && historyDate ? historyDate : today;
 
-  const { goals, updateGoals }                    = useGoals();
-  const { savedMeals, saveMeal, deleteSavedMeal } = useSavedMeals();
+  const {
+    selectedDay, allDays, loading, dayLoading, error,
+    addMeal, deleteMeal, updateMeal, mergeMeals, updateSteps, updateWater, refreshAll,
+  } = useNutritionData(activeDate);
+
+  const { goals, updateGoals, hydrated: goalsHydrated } = useGoals();
+  const { savedMeals, saveMeal, deleteSavedMeal }       = useSavedMeals();
+
+  // "History" only lists logged days up to today. The demo dataset also carries
+  // days in the future (reachable with the date picker).
+  const historyDays = useMemo(() => allDays.filter((day) => day.date <= today), [allDays, today]);
+  const streak = useMemo(() => computeStreak(allDays, today), [allDays, today]);
+
+  // ── Navigation ────────────────────────────────────────────
+  const goTo = useCallback((nextTab: Tab, nextHistoryDate: string | null = null) => {
+    setTab(nextTab);
+    setHistoryDate(nextHistoryDate);
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  /** Opens a day: today lives on the Today tab, any other date in History. */
+  const openDate = useCallback((date: string) => {
+    if (date === localISODate()) goTo("today");
+    else goTo("history", date);
+  }, [goTo]);
 
   // ── Demo helpers ──────────────────────────────────────────
   const exitDemo = useCallback(() => {
@@ -414,285 +108,119 @@ export default function HomePage() {
 
   const resetDemo = useCallback(async () => {
     setResettingDemo(true);
+    setDemoError(null);
     try {
-      await fetch("/api/demo/reset", { method: "POST" });
-      setSelectedDate(todayISO());
-      setHistoryDate(null);
-      setEditingMeal(null);
+      const res = await fetch("/api/demo/reset", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Could not reset the demo data.");
+      }
+      goTo("today");
       await refreshAll();
-    } catch {
-      // non-fatal
+    } catch (err) {
+      setDemoError(err instanceof Error ? err.message : "Could not reset the demo data.");
     } finally {
       setResettingDemo(false);
     }
-  }, [refreshAll]);
-
-  const totals = apiDayToSnapshot(selectedDay ?? null);
-
-  // "History" only lists logged days up to today. The demo dataset also carries
-  // days in the future (reachable with the date picker), and rendering a
-  // thousand cards at once would be pointless work.
-  const historyDays = useMemo(
-    () => allDays.filter((day) => day.date <= todayISO()),
-    [allDays],
-  );
-  const visibleHistoryDays = historyDays.slice(0, historyVisible);
-
-  const handleAdd = useCallback(
-    (values: MealFormValues) => addMeal(selectedDate, values),
-    [addMeal, selectedDate],
-  );
-
-  const handleUpdate = useCallback(
-    async (values: MealFormValues) => {
-      if (!editingMeal) return;
-      await updateMeal(editingMeal.id, values, selectedDate);
-      setEditingMeal(null);
-    },
-    [editingMeal, updateMeal, selectedDate],
-  );
-
-  const handleDelete = useCallback(
-    async (id: string) => {
-      await deleteMeal(id, selectedDate);
-      setEditingMeal((prev) => (prev?.id === id ? null : prev));
-    },
-    [deleteMeal, selectedDate],
-  );
-
-  const handleMerge = useCallback(
-    async (merged: MealFormValues, idsToDelete: string[]) => {
-      await mergeMeals(selectedDate, merged, idsToDelete);
-    },
-    [mergeMeals, selectedDate],
-  );
-
-  /** Navigate to a past day's detail view, scrolling to top */
-  const navigateToHistoryDate = useCallback((d: string) => {
-    if (d === todayISO()) {
-      setSelectedDate(todayISO());
-      setHistoryDate(null);
-      setTab("today");
-      setEditingMeal(null);
-      window.scrollTo({ top: 0 });
-      return;
-    }
-    setHistoryDate(d);
-    setTab("history");
-    setEditingMeal(null);
-    window.scrollTo({ top: 0 });
-  }, []);
-
-  /** Return to Today tab, scrolling to top */
-  const navigateToToday = useCallback(() => {
-    setSelectedDate(todayISO());
-    setHistoryDate(null);
-    setTab("today");
-    setEditingMeal(null);
-    window.scrollTo({ top: 0 });
-  }, []);
-
-
-  useEffect(() => {
-    if (!editingMeal || tab !== "today" || editScrollRequest === 0 || loading) return;
-
-    const rafId = window.requestAnimationFrame(() => {
-      mealFormRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    });
-
-    return () => window.cancelAnimationFrame(rafId);
-  }, [editingMeal, tab, editScrollRequest, loading]);
+  }, [goTo, refreshAll]);
 
   if (loading) return <PageSkeleton />;
+
+  const dayViewProps = {
+    day: selectedDay,
+    loading: dayLoading,
+    goals,
+    goalsHydrated,
+    onGoalsSave: updateGoals,
+    onDateChange: openDate,
+    onAddMeal: addMeal,
+    onUpdateMeal: updateMeal,
+    onDeleteMeal: deleteMeal,
+    onMergeMeals: mergeMeals,
+    onStepsSave: updateSteps,
+    onWaterChange: updateWater,
+    savedMeals,
+    onSaveTemplate: saveMeal,
+    onDeleteSaved: deleteSavedMeal,
+  };
 
   return (
     <div className="page-wrapper">
       {/* Header */}
-      <header className="page-header" style={{ justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: "var(--radius-md)",
-            background: "var(--md-surface-container-high)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 22,
-            boxShadow: "0 0 20px rgba(0,254,102,0.1)",
-          }}>🥗</div>
+      <header className="page-header">
+        <div className="page-header__brand">
+          <div className="page-header__logo" aria-hidden="true">🥗</div>
           <div>
             <h1>Nutrition</h1>
             <div className="subtitle">Daily tracker</div>
           </div>
         </div>
 
-        {/* User info / demo badge */}
-        {session?.user ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-            {session.user.image && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={session.user.image}
-                alt={session.user.name ?? "User"}
-                style={{ width: 34, height: 34, borderRadius: "50%", border: "2px solid var(--md-outline-variant)" }}
-              />
-            )}
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="btn-ghost btn-sm"
-              title="Sign out"
-              style={{ fontSize: "0.75rem" }}
-            >
-              Sign out
-            </button>
-          </div>
-        ) : isDemo ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-            <span style={{
-              fontSize: "0.6875rem",
-              fontWeight: 700,
-              padding: "4px 10px",
-              borderRadius: "var(--radius-full)",
-              background: "rgba(104, 185, 132, 0.12)",
-              color: "var(--md-primary)",
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-            }}>
-              Demo
+        <div className="page-header__actions">
+          {streak >= 2 && tab === "today" && (
+            <span className="streak-pill" title={`You've logged meals ${streak} days in a row`}>
+              🔥 {streak}-day streak
             </span>
-            <button onClick={exitDemo} className="btn-ghost btn-sm" style={{ fontSize: "0.75rem" }}>
-              Sign in →
-            </button>
-          </div>
-        ) : null}
+          )}
+          {session?.user ? (
+            <>
+              {session.user.image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={session.user.image} alt={session.user.name ?? "User"} className="page-header__avatar" />
+              )}
+              <button onClick={() => signOut({ callbackUrl: "/login" })} className="btn-ghost btn-sm">
+                Sign out
+              </button>
+            </>
+          ) : isDemo ? (
+            <button onClick={exitDemo} className="btn-ghost btn-sm">Sign in →</button>
+          ) : null}
+        </div>
       </header>
 
       {/* Demo banner */}
       {isDemo && (
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "var(--space-3)",
-          padding: "var(--space-3) var(--space-4)",
-          borderRadius: "var(--radius-md)",
-          background: "rgba(104, 185, 132, 0.06)",
-          border: "1px solid rgba(104, 185, 132, 0.15)",
-          fontSize: "0.8125rem",
-          flexWrap: "wrap",
-        }}>
-          <span style={{ color: "var(--md-on-surface-variant)" }}>
-            🔍 <strong style={{ color: "var(--md-primary)" }}>Demo mode</strong> — explore freely, all features work!
+        <div className="demo-banner">
+          <span>
+            <strong>Demo mode</strong> — explore freely, every feature works.
           </span>
-          <button
-            onClick={resetDemo}
-            disabled={resettingDemo}
-            className="btn-ghost btn-sm"
-            style={{ fontSize: "0.75rem", whiteSpace: "nowrap" }}
-          >
+          <button onClick={resetDemo} disabled={resettingDemo} className="btn-ghost btn-xs">
             {resettingDemo ? "Resetting…" : "↺ Reset data"}
+          </button>
+          {demoError && <span className="demo-banner__error">{demoError}</span>}
+        </div>
+      )}
+
+      {error && (
+        <div className="alert-error" role="alert" style={{ marginBottom: "var(--space-5)" }}>
+          <span>⚠️</span>
+          <span>Some data didn&apos;t load: {error}</span>
+          <button type="button" className="btn-ghost btn-xs" onClick={() => void refreshAll()} style={{ marginLeft: "auto" }}>
+            Retry
           </button>
         </div>
       )}
 
-      {/* Tab bar */}
-      <div className="tab-bar">
+      {/* Tab bar — a pill bar on desktop, a bottom navigation bar on phones */}
+      <nav className="tab-bar" aria-label="Sections">
         {(["today", "trend", "history", "connect-step"] as Tab[]).map((t) => (
           <button
             key={t}
-            onClick={() => {
-              if (t === "today") {
-                navigateToToday();
-              } else if (t === "history") {
-                setTab("history");
-                setHistoryDate(null);
-                setEditingMeal(null);
-                window.scrollTo({ top: 0 });
-              } else {
-                setTab(t);
-                setEditingMeal(null);
-                window.scrollTo({ top: 0 });
-              }
-            }}
+            onClick={() => goTo(t)}
             className={tab === t ? "active" : ""}
+            aria-current={tab === t ? "page" : undefined}
           >
-            {t === "today"
-              ? "Today"
-              : t === "trend"
-                ? "Trend"
-                : t === "history"
-                  ? `History${allDays.length > 0 ? ` (${allDays.length})` : ""}`
-                  : "Connect Step"}
+            <span className="tab-bar__icon">{TAB_ICONS[t]}</span>
+            <span className="tab-bar__label">{TAB_LABELS[t]}</span>
           </button>
         ))}
-      </div>
+      </nav>
 
       {/* TODAY tab */}
       {tab === "today" && (
         <div className="stack" style={{ gap: "var(--space-5)" }}>
-          <DatePicker
-            date={selectedDate}
-            steps={selectedDay?.totalSteps ?? 0}
-            stepSource={selectedDay?.stepsSource ?? null}
-            stepsSyncedAt={selectedDay?.stepsSyncedAt ?? null}
-            onChange={(d) => {
-              if (d === todayISO()) {
-                setSelectedDate(d);
-                setEditingMeal(null);
-              } else {
-                navigateToHistoryDate(d);
-              }
-            }}
-            onStepsSave={(steps) => updateSteps(selectedDate, steps)}
-          />
-
-          <DayTotals
-            totals={totals}
-            goals={goals}
-            mealCount={selectedDay?.meals.length ?? 0}
-            selectedDate={selectedDate}
-            onGoalsSave={updateGoals}
-            meals={(selectedDay?.meals ?? []).map(({ id: _id, createdAt: _createdAt, ...meal }) => meal)}
-            savedMeals={savedMeals.map(({ id: _id, ...meal }) => meal)}
-          />
-
-          <div ref={mealFormRef} style={{ scrollMarginTop: "var(--space-6)" }}>
-            {editingMeal ? (
-              <MealForm
-                key={editingMeal.id}
-                initialValues={{
-                  name: editingMeal.name, category: editingMeal.category,
-                  calories: editingMeal.calories,
-                  protein: editingMeal.protein, carbs: editingMeal.carbs,
-                  fat: editingMeal.fat, satFat: editingMeal.satFat,
-                  fibre: editingMeal.fibre, addedSugar: editingMeal.addedSugar,
-                  naturalSugar: editingMeal.naturalSugar, salt: editingMeal.salt,
-                  alcohol: editingMeal.alcohol ?? 0,
-                  omega3: editingMeal.omega3 ?? 0,
-                }}
-                onSubmit={handleUpdate}
-                onCancel={() => setEditingMeal(null)}
-                onSaveTemplate={saveMeal}
-              />
-            ) : (
-              <MealForm
-                onSubmit={handleAdd}
-                savedMeals={savedMeals}
-                onSaveTemplate={saveMeal}
-                onDeleteSaved={deleteSavedMeal}
-              />
-            )}
-          </div>
-
-          <MealList
-            meals={(selectedDay?.meals ?? []).map((m) => ({ ...m, date: selectedDate }))}
-            onEdit={(meal) => {
-              setEditingMeal(meal as ApiMeal);
-              setEditScrollRequest((prev) => prev + 1);
-            }}
-            onDelete={handleDelete}
-            onMerge={handleMerge}
-          />
+          <DayView date={today} {...dayViewProps} />
+          <WeightPanel date={today} />
         </div>
       )}
 
@@ -702,10 +230,10 @@ export default function HomePage() {
           <div className="card" style={{ padding: "var(--space-6)", display: "grid", gap: "var(--space-4)" }}>
             <div>
               <div className="section-label" style={{ marginBottom: "var(--space-2)" }}>
-                Trend Analysis
+                Trend analysis
               </div>
               <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)", lineHeight: 1.55 }}>
-                Review your averages, switch between 1 week and longer periods, and tap the chart to jump into a specific day.
+                Averages over the days you logged, with the change against the previous period. Pick a nutrient to chart it.
               </p>
             </div>
 
@@ -722,20 +250,11 @@ export default function HomePage() {
 
           <WeeklyChart
             allDays={allDays}
-            selectedDate={selectedDate}
+            selectedDate={today}
             goals={goals}
             metric={selectedMetric}
             timePeriod={timePeriod}
-            onSelectDate={(d) => {
-              if (d === todayISO()) {
-                setSelectedDate(d);
-                setTab("today");
-                setEditingMeal(null);
-                window.scrollTo({ top: 0 });
-              } else {
-                navigateToHistoryDate(d);
-              }
-            }}
+            onSelectDate={openDate}
           />
         </div>
       )}
@@ -743,59 +262,20 @@ export default function HomePage() {
       {/* HISTORY tab */}
       {tab === "history" && (
         historyDate ? (
-          <DayDetail
-            day={allDays.find((d) => d.date === historyDate) ?? null}
-            date={historyDate}
-            goals={goals}
-            onGoalsSave={updateGoals}
-            onBack={() => { setHistoryDate(null); window.scrollTo({ top: 0 }); }}
-            onDateChange={navigateToHistoryDate}
-            onAddMeal={addMeal}
-            onUpdateMeal={updateMeal}
-            onDeleteMeal={deleteMeal}
-            onMergeMeals={mergeMeals}
-            onStepsSave={updateSteps}
-            savedMeals={savedMeals}
-            onSaveTemplate={saveMeal}
-            onDeleteSaved={deleteSavedMeal}
-          />
-        ) : (
-          <div>
-            <div className="section-label" style={{ marginBottom: "var(--space-3)" }}>
-              All Logged Days ({historyDays.length})
-            </div>
-            {historyDays.length === 0 ? (
-              <div className="card" style={{ padding: "var(--space-12)", textAlign: "center" }}>
-                <div style={{ fontSize: "3rem", marginBottom: "var(--space-3)" }}>📅</div>
-                <p style={{ fontWeight: 700, marginBottom: 6 }}>No days logged yet</p>
-                <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)" }}>
-                  Start logging meals on the Today tab.
-                </p>
-              </div>
-            ) : (
-              <div className="stack" style={{ gap: "var(--space-3)" }}>
-                {visibleHistoryDays.map((d) => (
-                  <DayCard key={d.date} day={d} goals={goals} onClick={() => navigateToHistoryDate(d.date)} />
-                ))}
-                {historyDays.length > visibleHistoryDays.length && (
-                  <button
-                    type="button"
-                    className="btn-tonal btn-sm"
-                    onClick={() => setHistoryVisible((count) => count + HISTORY_PAGE_SIZE)}
-                    style={{ justifySelf: "center" }}
-                  >
-                    Load more days ({historyDays.length - visibleHistoryDays.length} remaining)
-                  </button>
-                )}
-              </div>
-            )}
+          <div className="stack" style={{ gap: "var(--space-3)" }}>
+            <button onClick={() => goTo("history")} className="btn-ghost btn-sm" style={{ alignSelf: "flex-start", paddingLeft: 0 }}>
+              ← Back to history
+            </button>
+            <DayView date={historyDate} {...dayViewProps} />
           </div>
+        ) : (
+          <HistoryList days={historyDays} goals={goals} canExport={isSignedIn} onOpenDay={openDate} />
         )
       )}
 
       {/* CONNECT STEP tab */}
       {tab === "connect-step" && (
-        Boolean(session?.user) ? (
+        isSignedIn ? (
           <StepSyncPanel enabled onRefreshData={refreshAll} />
         ) : (
           <div className="card" style={{ padding: "var(--space-6)", display: "grid", gap: "var(--space-4)" }}>
@@ -805,7 +285,7 @@ export default function HomePage() {
               </div>
               <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)", lineHeight: 1.55, maxWidth: 720 }}>
                 Step sync needs a signed-in account so your iPhone or Android device can send steps to the right profile.
-                In demo mode you can still log steps manually from the day picker.
+                In demo mode you can still log steps manually on the Today tab.
               </p>
             </div>
 
@@ -830,7 +310,7 @@ export default function HomePage() {
               <button
                 type="button"
                 className="btn-primary btn-sm"
-                onClick={() => { window.location.href = "/login"; }}
+                onClick={exitDemo}
                 style={{ width: "fit-content" }}
               >
                 Sign in to connect steps

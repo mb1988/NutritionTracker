@@ -62,12 +62,16 @@ export type DailyGoals = {
   salt: number;
   alcohol: number;
   omega3: number;
+  /** Daily water target in millilitres. */
+  waterGoal: number;
   stepCalorieAdjustment: boolean;
 };
 
 export type NumericGoalKey = Exclude<keyof DailyGoals, "stepCalorieAdjustment">;
 
-export type SelectableMetricKey = NumericGoalKey;
+export type NutrientGoalKey = Exclude<NumericGoalKey, "waterGoal">;
+
+export type SelectableMetricKey = NutrientGoalKey;
 
 export const NUTRITION_METRICS: Record<
   SelectableMetricKey,
@@ -182,6 +186,7 @@ export const DEFAULT_GOALS: DailyGoals = {
   salt: 6,
   alcohol: 2,
   omega3: 250,
+  waterGoal: 2000,
   stepCalorieAdjustment: false,
 };
 
@@ -201,10 +206,5 @@ export const EMPTY_FORM_VALUES: MealFormValues = {
   omega3: 0,
 };
 
-export const LS_KEY = "nutrition_tracker_meals";
 export const LS_GOALS_KEY = "nutrition_tracker_goals";
 export const LS_SAVED_MEALS_KEY = "nutrition_tracker_saved_meals";
-
-/** Hardcoded for single-user dev mode. Replace with auth session in production. */
-export const USER_ID = "cmn7km9hs0000cad8s6kslzcp";
-

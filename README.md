@@ -18,10 +18,13 @@ Try it instantly — no sign-up required. Demo mode provides full functionality 
 - Search previously logged meals and load their nutrition values directly into the add-meal form
 - Per-meal **health-coloured badges** (green / orange / red) based on NHS reference intake guidelines
 - Edit and delete individual meals inline
-- Track daily steps
+- Track daily steps and water intake (tap a glass per 250 ml, against a configurable water goal)
+- Log body weight in kg or lb, with a 30-entry sparkline and a weekly change readout
+- Logging streak in the header once you have logged meals two days in a row
 - Optionally adjust the calorie target from steps, using about 40 kcal per 1,000 steps
 - Optional phone step sync for signed-in users: iPhone via Apple Health → Shortcuts → secure webhook
-- Collapsible "Log meal" form and "Meals logged" list for a clean interface
+- Calorie ring with protein, carbs and fat up front; every nutrient is one tap away and over-limit nutrients are flagged even when collapsed
+- Collapsible "Log meal" form and "Meals logged" list, with a confirm step before deleting a meal
 - Navigate between days with arrow buttons or a calendar date picker
 
 ### Meal Reuse
@@ -40,9 +43,9 @@ Try it instantly — no sign-up required. Demo mode provides full functionality 
 ### Trend Analysis
 - Configurable metric selector covering all tracked nutrients plus steps
 - Interactive bar chart with daily values and goal reference line
-- Period-averaged trend cards with direction indicators
+- Period-averaged trend cards with change vs the previous period (coloured by whether the change is an improvement)
 - Time period switcher: 1 week · 1 month · 3 months · 6 months
-- Data coverage notice when you have fewer logged days than the selected period
+- Data coverage notice when you have fewer logged days than the selected period; weekly/monthly bars average logged days only
 
 ### History
 - Browse all logged days with at-a-glance summaries (calories, P/C/F, score)
@@ -50,6 +53,7 @@ Try it instantly — no sign-up required. Demo mode provides full functionality 
 - Drill into any day to see the **identical** progress view as Today (same DayTotals component)
 - Full meal editing, adding, and deleting from the history detail view
 - Day-to-day navigation with arrows and calendar picker
+- Export every logged meal as CSV (signed-in users)
 
 ### Demo Mode
 - Anonymous demo experience — no login required
@@ -66,7 +70,7 @@ Try it instantly — no sign-up required. Demo mode provides full functionality 
 - Android provider support is scaffolded server-side and marked as coming soon in the UI
 
 ### Auth & Access Control
-- GitHub OAuth sign-in via NextAuth
+- GitHub and Google OAuth sign-in via NextAuth (each provider appears only when configured, with its own allowlist)
 - All API routes protected by middleware
 - Data fully scoped to the authenticated user
 - Demo users get an isolated sandbox with their own data
@@ -96,7 +100,7 @@ User
  └─ Day            (one per calendar date; stores recalculated snapshot totals)
      └─ Meal       (individual food entries with 11 nutrient fields)
  └─ SavedMeal      (reusable meal templates)
- └─ UserProfile    (daily nutrition goals per nutrient)
+ └─ WeightEntry    (one weigh-in per calendar date)
 ```
 
 `Day` totals are recalculated server-side whenever a meal is created, updated, or deleted — the client never computes aggregates.
@@ -113,6 +117,10 @@ ALLOWED_GITHUB_USERNAME=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
 OPENAI_API_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+ALLOWED_GOOGLE_EMAIL=
+REDIS_URL=
 ```
 
 | Variable | Purpose |
@@ -124,6 +132,9 @@ OPENAI_API_KEY=
 | `NEXTAUTH_SECRET` | Secret used to sign NextAuth session tokens |
 | `NEXTAUTH_URL` | Full public URL of the app (e.g. `https://yourapp.up.railway.app`) |
 | `OPENAI_API_KEY` | OpenAI API key for AI-powered meal logging (`gpt-4o` by default). Packaged-food lookup via Open Food Facts does not require a key. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional Google OAuth credentials. The Google sign-in button only appears when both are set. |
+| `ALLOWED_GOOGLE_EMAIL` | Restricts Google sign-in to a single verified email address |
+| `REDIS_URL` | Optional. Shares rate-limit counters across instances; without it, limits are kept in memory per process |
 | `OPENAI_MODEL` | Optional override for the default AI model used by the meal assistant. If unset, the default mode uses `gpt-4o` and the lower-cost mode uses `gpt-4o-mini`. |
 
 ---
@@ -171,9 +182,14 @@ All routes require an active session or a valid demo cookie. Data is scoped to t
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/days` | List days (optional `?date=YYYY-MM-DD` for a single day) |
+| `GET` | `/api/days` | List logged day summaries with a meal count (or `?date=YYYY-MM-DD` for one day with its meals) |
 | `POST` | `/api/days` | Upsert a day record |
-| `PATCH` | `/api/days` | Update day-level fields (e.g. steps) |
+| `PATCH` | `/api/days` | Update a day-level field: `{ date, steps }` or `{ date, waterMl }` |
+| `GET` | `/api/weight?today=YYYY-MM-DD` | Weigh-ins from the last 90 days |
+| `POST` | `/api/weight` | Record (or replace) the weigh-in for a date |
+| `DELETE` | `/api/weight?date=YYYY-MM-DD` | Remove a weigh-in |
+| `GET` | `/api/export` | Download every logged meal as CSV (signed-in users only) |
+| `GET` / `PATCH` | `/api/user/goals` | Read or save daily goals (signed-in users) |
 | `POST` | `/api/meals` | Create a meal and recalculate day totals |
 | `PATCH` | `/api/meals/:id` | Update a meal and recalculate day totals |
 | `DELETE` | `/api/meals/:id` | Delete a meal and recalculate day totals |
@@ -182,7 +198,7 @@ All routes require an active session or a valid demo cookie. Data is scoped to t
 | `POST` | `/api/saved-meals` | Create a saved meal template |
 | `DELETE` | `/api/saved-meals/:id` | Delete a saved meal template |
 | `POST` | `/api/saved-meals/use` | Add a saved meal to a specific day |
-| `POST` | `/api/demo/reset` | Reset demo user data to sample defaults |
+| `POST` | `/api/demo/reset` | Reset demo user data to sample defaults (rate limited per IP) |
 | `POST` | `/api/ai-log` | Hybrid nutrition estimate: packaged-food lookup via Open Food Facts first, then AI completion/fallback (returns JSON, no DB write) |
 | `GET` | `/api/step-sync` | Read current signed-in user phone step sync config |
 | `POST` | `/api/step-sync` | Enable/rotate a phone step sync token for a provider |
@@ -238,5 +254,5 @@ The project runs on Railway's Free plan, which shapes how it is operated:
 
 ```bash
 npm run typecheck   # catch type errors
-npm run test        # unit tests (calculations.test.ts)
+npm run test        # Vitest unit tests (services, contracts, auth, rate limiting, utilities)
 ```

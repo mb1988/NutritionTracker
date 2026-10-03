@@ -1,14 +1,54 @@
 import { type NextAuthOptions } from "next-auth";
+import { type Provider } from "next-auth/providers/index";
 import GitHubProvider from "next-auth/providers/github";
+import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 
+/** Only offer the sign-in options whose credentials are configured. */
+function configuredProviders(): Provider[] {
+  const providers: Provider[] = [];
+
+  if (process.env.GITHUB_ID && process.env.GITHUB_CLIENT_SECRET) {
+    providers.push(GitHubProvider({
+      clientId:     process.env.GITHUB_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    }));
+  }
+
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    providers.push(GoogleProvider({
+      clientId:     process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }));
+  }
+
+  return providers;
+}
+
+type SignInProfile = { login?: string; email?: string; email_verified?: boolean } | undefined;
+
+/**
+ * Applies the per-provider allowlist. An unset allowlist variable means that
+ * provider is open to any account.
+ */
+export function isSignInAllowed(provider: string | undefined, profile: SignInProfile): boolean {
+  if (provider === "github") {
+    const allowedUsername = process.env.ALLOWED_GITHUB_USERNAME;
+    return !allowedUsername || profile?.login === allowedUsername;
+  }
+
+  if (provider === "google") {
+    // Never trust an unverified Google email for an allowlist match.
+    if (profile?.email_verified === false) return false;
+    const allowedEmail = process.env.ALLOWED_GOOGLE_EMAIL?.trim().toLowerCase();
+    return !allowedEmail || profile?.email?.toLowerCase() === allowedEmail;
+  }
+
+  return false;
+}
+
 export const authOptions: NextAuthOptions = {
-  providers: [
-    GitHubProvider({
-      clientId:     process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    }),
-  ],
+  providers: configuredProviders(),
 
   session: { strategy: "jwt" },
 
@@ -19,16 +59,13 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     /**
-     * Gate: only the GitHub username in ALLOWED_GITHUB_USERNAME can sign in.
-     * Anyone else gets redirected back to /login with error=AccessDenied.
+     * Gate: only the accounts in ALLOWED_GITHUB_USERNAME / ALLOWED_GOOGLE_EMAIL
+     * can sign in. Anyone else gets redirected back to /login with
+     * error=AccessDenied.
      */
-    async signIn({ user, profile }) {
-      const allowedUsername = process.env.ALLOWED_GITHUB_USERNAME;
-      const githubLogin     = (profile as { login?: string } | undefined)?.login;
-
-      // Block if the username doesn't match
-      if (allowedUsername && githubLogin !== allowedUsername) {
-        console.warn(`[auth] Blocked sign-in attempt from GitHub user: ${githubLogin}`);
+    async signIn({ user, account, profile }) {
+      if (!isSignInAllowed(account?.provider, profile as SignInProfile)) {
+        console.warn(`[auth] Blocked ${account?.provider ?? "unknown"} sign-in attempt`);
         return false;
       }
 

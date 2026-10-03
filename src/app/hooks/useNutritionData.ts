@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { type MealFormValues } from "@/app/types";
 
 // ── Shared types ──────────────────────────────────────────────
@@ -23,7 +23,8 @@ export type ApiMeal = {
   createdAt?: string;
 };
 
-export type ApiDay = {
+/** Day totals without the meals — what the all-days endpoint returns. */
+export type ApiDaySummary = {
   id: string;
   date: string;
   totalCalories: number;
@@ -40,6 +41,12 @@ export type ApiDay = {
   stepsSyncedAt?: string | null;
   totalAlcohol: number;
   totalOmega3: number;
+  totalWaterMl: number;
+  mealCount: number;
+};
+
+/** A single day with its meals. */
+export type ApiDay = Omit<ApiDaySummary, "mealCount"> & {
   meals: ApiMeal[];
 };
 
@@ -47,20 +54,6 @@ export type ApiDay = {
 
 // Session cookie is sent automatically — no need for x-user-id header
 const HEADERS = { "Content-Type": "application/json" };
-
-async function fetchDay(date: string): Promise<ApiDay | null> {
-  const res = await fetch(`/api/days?date=${date}`, { headers: HEADERS });
-  if (!res.ok) throw new Error(`Failed to fetch day ${date}`);
-  const data = await res.json();
-  return data.day ?? null;
-}
-
-async function fetchAllDays(): Promise<ApiDay[]> {
-  const res = await fetch("/api/days", { headers: HEADERS });
-  if (!res.ok) throw new Error("Failed to fetch days");
-  const data = await res.json();
-  return data.days ?? [];
-}
 
 async function requestOk(input: RequestInfo | URL, init?: RequestInit) {
   const res = await fetch(input, init);
@@ -77,66 +70,103 @@ async function requestOk(input: RequestInfo | URL, init?: RequestInit) {
   return res;
 }
 
-function shouldKeepDay(day: ApiDay) {
-  return day.meals.length > 0 || day.totalSteps > 0;
+async function fetchDay(date: string): Promise<ApiDay | null> {
+  const res = await requestOk(`/api/days?date=${date}`, { headers: HEADERS });
+  const data = await res.json();
+  return data.day ?? null;
+}
+
+async function fetchDaySummaries(): Promise<ApiDaySummary[]> {
+  const res = await requestOk("/api/days", { headers: HEADERS });
+  const data = await res.json();
+  return data.days ?? [];
+}
+
+function toSummary({ meals, ...day }: ApiDay): ApiDaySummary {
+  return { ...day, mealCount: meals.length };
+}
+
+function isLogged(day: ApiDaySummary) {
+  return day.mealCount > 0 || day.totalSteps > 0 || day.totalWaterMl > 0;
+}
+
+/** Inserts, replaces or drops one day in the newest-first summaries list. */
+function upsertSummary(days: ApiDaySummary[], date: string, day: ApiDay | null): ApiDaySummary[] {
+  const without = days.filter((d) => d.date !== date);
+  const summary = day ? toSummary(day) : null;
+  if (!summary || !isLogged(summary)) return without;
+  return [...without, summary].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // ── Hook ──────────────────────────────────────────────────────
 
 export type UseNutritionData = {
+  /** The day being viewed (with meals), or null when nothing is logged for it. */
   selectedDay: ApiDay | null;
-  allDays: ApiDay[];
+  /** Every logged day, newest first, without meals. */
+  allDays: ApiDaySummary[];
+  /** True until the first load finishes. */
   loading: boolean;
+  /** True while switching to a different day. */
+  dayLoading: boolean;
+  /** Set when loading data failed. */
+  error: string | null;
   addMeal: (date: string, values: MealFormValues) => Promise<void>;
   deleteMeal: (mealId: string, date: string) => Promise<void>;
   updateMeal: (mealId: string, values: MealFormValues, date: string) => Promise<void>;
   mergeMeals: (date: string, values: MealFormValues, mealIdsToDelete: string[]) => Promise<void>;
   updateSteps: (date: string, steps: number) => Promise<void>;
+  updateWater: (date: string, waterMl: number) => Promise<void>;
   refreshDay: (date: string) => Promise<void>;
   refreshAll: () => Promise<void>;
 };
 
-export function useNutritionData(selectedDate: string): UseNutritionData {
+export function useNutritionData(activeDate: string): UseNutritionData {
   const [selectedDay, setSelectedDay] = useState<ApiDay | null>(null);
-  const [allDays, setAllDays] = useState<ApiDay[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allDays, setAllDays] = useState<ApiDaySummary[]>([]);
+  const [summariesLoaded, setSummariesLoaded] = useState(false);
+  const [loadedDate, setLoadedDate] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load selected day + all days on mount or date change
+  // Lets async callbacks know which day is on screen when they resolve.
+  const activeDateRef = useRef(activeDate);
+  activeDateRef.current = activeDate;
+
+  // Summaries load once; mutations keep them current via refreshDay.
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    Promise.all([fetchDay(selectedDate), fetchAllDays()])
-      .then(([day, days]) => {
-        if (!cancelled) {
-          setSelectedDay(day);
-          setAllDays(days);
-          setLoading(false);
-        }
-      })
-      .catch(() => { if (!cancelled) setLoading(false); });
+    fetchDaySummaries()
+      .then((days) => { if (!cancelled) setAllDays(days); })
+      .catch((err: Error) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setSummariesLoaded(true); });
     return () => { cancelled = true; };
-  }, [selectedDate]);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDay(activeDate)
+      .then((day) => { if (!cancelled) setSelectedDay(day); })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setSelectedDay(null);
+        setError(err.message);
+      })
+      .finally(() => { if (!cancelled) setLoadedDate(activeDate); });
+    return () => { cancelled = true; };
+  }, [activeDate]);
 
   const refreshDay = useCallback(async (date: string) => {
     const day = await fetchDay(date);
-    setSelectedDay((current) => (date === selectedDate ? day : current));
-    setAllDays((prev) =>
-      day
-        ? shouldKeepDay(day)
-          ? prev.some((d) => d.date === date)
-          ? prev.map((d) => (d.date === date ? day : d))
-          : [day, ...prev].sort((a, b) => b.date.localeCompare(a.date))
-          : prev.filter((d) => d.date !== date)
-        : prev,
-    );
-  }, [selectedDate]);
+    if (date === activeDateRef.current) setSelectedDay(day);
+    setAllDays((prev) => upsertSummary(prev, date, day));
+  }, []);
 
   const refreshAll = useCallback(async () => {
-    const days = await fetchAllDays();
+    const [days, day] = await Promise.all([fetchDaySummaries(), fetchDay(activeDateRef.current)]);
     setAllDays(days);
-    const current = days.find((d) => d.date === selectedDate) ?? null;
-    setSelectedDay(current);
-  }, [selectedDate]);
+    setSelectedDay(day);
+    setError(null);
+  }, []);
 
   const addMeal = useCallback(async (date: string, values: MealFormValues) => {
     await requestOk("/api/meals", {
@@ -168,11 +198,14 @@ export function useNutritionData(selectedDate: string): UseNutritionData {
       body: JSON.stringify({ ...values, date }),
     });
 
-    for (const mealId of mealIdsToDelete) {
-      await requestOk(`/api/meals/${mealId}`, { method: "DELETE", headers: HEADERS });
+    try {
+      for (const mealId of mealIdsToDelete) {
+        await requestOk(`/api/meals/${mealId}`, { method: "DELETE", headers: HEADERS });
+      }
+    } finally {
+      // Show whatever state the server ended up in, even after a partial failure.
+      await refreshDay(date);
     }
-
-    await refreshDay(date);
   }, [refreshDay]);
 
   const updateSteps = useCallback(async (date: string, steps: number) => {
@@ -184,6 +217,35 @@ export function useNutritionData(selectedDate: string): UseNutritionData {
     await refreshDay(date);
   }, [refreshDay]);
 
-  return { selectedDay, allDays, loading, addMeal, deleteMeal, updateMeal, mergeMeals, updateSteps, refreshDay, refreshAll };
-}
+  const updateWater = useCallback(async (date: string, waterMl: number) => {
+    // Optimistic: water taps should feel instant.
+    if (date === activeDateRef.current) {
+      setSelectedDay((day) => (day ? { ...day, totalWaterMl: waterMl } : day));
+    }
+    try {
+      await requestOk("/api/days", {
+        method: "PATCH",
+        headers: HEADERS,
+        body: JSON.stringify({ date, waterMl }),
+      });
+    } finally {
+      await refreshDay(date);
+    }
+  }, [refreshDay]);
 
+  return {
+    selectedDay,
+    allDays,
+    loading: !summariesLoaded || loadedDate === null,
+    dayLoading: loadedDate !== activeDate,
+    error,
+    addMeal,
+    deleteMeal,
+    updateMeal,
+    mergeMeals,
+    updateSteps,
+    updateWater,
+    refreshDay,
+    refreshAll,
+  };
+}

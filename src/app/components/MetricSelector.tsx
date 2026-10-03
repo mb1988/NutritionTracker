@@ -1,11 +1,11 @@
 "use client";
 
 import { NUTRITION_METRICS, type DailyGoals, type SelectableMetricKey } from "@/app/types";
-import { type ApiDay } from "@/app/hooks/useNutritionData";
+import { type ApiDaySummary } from "@/app/hooks/useNutritionData";
 import { type TimePeriod, getDateRangeForPeriod } from "@/app/components/TimePeriodSelector";
 
 type Props = {
-  allDays: ApiDay[];
+  allDays: ApiDaySummary[];
   goals: DailyGoals;
   selectedMetric: SelectableMetricKey;
   timePeriod: TimePeriod;
@@ -29,8 +29,39 @@ function formatMetricValue(value: number, unit: string) {
   return `${Math.round(value * 10) / 10}${unit}`;
 }
 
+/** Average of a metric over the logged days among `dates`, or null when none are logged. */
+function averageOver(dates: string[], byDate: Map<string, ApiDaySummary>, apiKey: string): number | null {
+  const values = dates
+    .filter((date) => byDate.has(date))
+    .map((date) => Number((byDate.get(date) as Record<string, unknown>)[apiKey] ?? 0));
+  return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : null;
+}
+
+/** Changes smaller than this (as a fraction) read as "steady". */
+const STEADY_THRESHOLD = 0.03;
+
+function TrendArrow({ current, previous, reverse }: { current: number; previous: number | null; reverse: boolean }) {
+  if (previous === null || previous === 0) return null;
+  const change = (current - previous) / previous;
+  if (Math.abs(change) < STEADY_THRESHOLD) {
+    return <span className="trend-arrow" title="About the same as the previous period">→ steady</span>;
+  }
+  const up = change > 0;
+  // For limits (sugar, salt…) going down is good; for targets (protein, fibre…) going up is.
+  const improving = reverse ? up : !up;
+  return (
+    <span
+      className={`trend-arrow ${improving ? "trend-arrow--good" : "trend-arrow--bad"}`}
+      title={`${up ? "Up" : "Down"} ${Math.round(Math.abs(change) * 100)}% vs the previous period`}
+    >
+      {up ? "↑" : "↓"} {Math.round(Math.abs(change) * 100)}%
+    </span>
+  );
+}
+
 export function MetricSelector({ allDays, goals, selectedMetric, timePeriod, onSelect }: Props) {
   const periodDays = getDateRangeForPeriod(timePeriod);
+  const previousDays = getDateRangeForPeriod(timePeriod, 1);
   const byDate = new Map(allDays.map((day) => [day.date, day]));
 
   // Days in the period that actually exist in the DB
@@ -65,14 +96,9 @@ export function MetricSelector({ allDays, goals, selectedMetric, timePeriod, onS
           const metric = NUTRITION_METRICS[metricKey];
 
           // Average only over days that are actually logged
-          const loggedValues = periodDays
-            .filter((date) => byDate.has(date))
-            .map((date) => Number((byDate.get(date) as Record<string, unknown>)[metric.apiTotalKey] ?? 0));
-
-          const avg =
-            loggedValues.length > 0
-              ? loggedValues.reduce((sum, v) => sum + v, 0) / loggedValues.length
-              : 0;
+          const average = averageOver(periodDays, byDate, metric.apiTotalKey);
+          const previousAverage = averageOver(previousDays, byDate, metric.apiTotalKey);
+          const avg = average ?? 0;
 
           const target = goals[metricKey];
           const color = getStatusColor(avg, target, metric.reverse);
@@ -100,6 +126,7 @@ export function MetricSelector({ allDays, goals, selectedMetric, timePeriod, onS
                 minHeight: 72,
               }}
               title={`Show trend for ${metric.label}`}
+              aria-pressed={isSelected}
             >
               <span
                 style={{
@@ -116,12 +143,12 @@ export function MetricSelector({ allDays, goals, selectedMetric, timePeriod, onS
                 style={{
                   fontSize: "0.95rem",
                   fontWeight: 800,
-                  color: loggedValues.length > 0 ? color : "var(--md-on-surface-variant)",
+                  color: average !== null ? color : "var(--md-on-surface-variant)",
                   lineHeight: 1.1,
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
-                {loggedValues.length > 0 ? formatMetricValue(avg, metric.unit) : "—"}
+                {average !== null ? formatMetricValue(avg, metric.unit) : "—"}
               </span>
               <span
                 style={{
@@ -130,8 +157,11 @@ export function MetricSelector({ allDays, goals, selectedMetric, timePeriod, onS
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
-                {formatMetricValue(target, metric.unit)} tgt
+                {formatMetricValue(target, metric.unit)} {metric.reverse ? "target" : "limit"}
               </span>
+              {average !== null && (
+                <TrendArrow current={average} previous={previousAverage} reverse={metric.reverse} />
+              )}
             </button>
           );
         })}

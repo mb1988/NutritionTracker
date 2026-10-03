@@ -7,7 +7,7 @@ import { checkRateLimit } from "@/lib/rateLimit";
 export async function POST(request: NextRequest) {
   try {
     const userId = await getAuthenticatedUserId();
-    checkRateLimit(userId, 10, 60_000);
+    await checkRateLimit(userId, 10, 60_000);
     const body = await request.json();
     const input = foodSuggestionRequestSchema.parse(body);
     const result = await generateFoodSuggestions(input);

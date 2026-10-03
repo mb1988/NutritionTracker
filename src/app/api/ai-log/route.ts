@@ -7,7 +7,7 @@ import { checkRateLimit } from "@/lib/rateLimit";
 export async function POST(request: NextRequest) {
   try {
     const userId = await getAuthenticatedUserId(); // auth gate — no DB write, just verify access
-    checkRateLimit(userId, 15, 60_000);
+    await checkRateLimit(userId, 15, 60_000);
     const body = await request.json();
     const input = aiLogRequestSchema.parse(body);
     const result = await estimateNutrition(input);

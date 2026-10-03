@@ -7,7 +7,7 @@ import { MealItem } from "@/app/components/MealItem";
 type Props = {
   meals: LocalMeal[];
   onEdit: (meal: LocalMeal) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<void> | void;
   onMerge: (merged: MealFormValues, idsToDelete: string[]) => Promise<void>;
 };
 
@@ -43,6 +43,16 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [mergeSubmitting, setMergeSubmitting] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function handleDelete(id: string) {
+    setActionError(null);
+    try {
+      await onDelete(id);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not delete the meal.");
+    }
+  }
 
   if (meals.length === 0) {
     return (
@@ -52,7 +62,7 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
           No meals logged yet
         </p>
         <p style={{ fontSize: "0.875rem", color: "var(--md-on-surface-variant)" }}>
-          Use the form above to log your first meal.
+          Open <strong>Log meal</strong> above to scan a barcode, describe what you ate, or reuse a past meal.
         </p>
       </div>
     );
@@ -115,28 +125,27 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
     <div className="card" style={{ overflow: "hidden" }}>
       <div
         className="card-header"
-        style={{ borderBottom: "none", background: "rgba(255,255,255,0.04)", cursor: mergeMode ? undefined : "pointer", userSelect: "none" }}
-        onClick={mergeMode ? undefined : () => setCollapsed((c) => !c)}
+        style={{ borderBottom: "none", background: "rgba(255,255,255,0.04)" }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-          {!mergeMode && (
-            <span style={{
-              fontSize: "0.75rem",
-              transition: "transform 0.2s ease",
-              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
-              display: "inline-block",
-            }}>
-              ▼
-            </span>
-          )}
-          <h2 style={{ fontWeight: 800 }}>{mergeMode ? "Select meals to merge" : "Meals logged"}</h2>
-        </div>
+        {mergeMode ? (
+          <h2 style={{ fontWeight: 800 }}>Select meals to merge</h2>
+        ) : (
+          <button
+            type="button"
+            className="section-toggle"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+          >
+            <span className={collapsed ? "chevron" : "chevron chevron--open"} aria-hidden="true">▾</span>
+            <h2>Meals logged</h2>
+          </button>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {!mergeMode && meals.length >= 2 && (
             <button
               type="button"
               className="btn-ghost btn-sm"
-              onClick={(e) => { e.stopPropagation(); enterMergeMode(); }}
+              onClick={enterMergeMode}
               title="Merge meals"
               style={{ fontSize: "0.75rem" }}
             >
@@ -163,6 +172,12 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
         </div>
       </div>
 
+      {actionError && (
+        <div className="alert-error" style={{ margin: "var(--space-3) var(--space-4)" }} role="alert">
+          <span>⚠️</span><span>{actionError}</span>
+        </div>
+      )}
+
       {mergeMode && (
         <div style={{ padding: "var(--space-3) var(--space-4)", borderBottom: "1px solid rgba(255,255,255,0.06)", fontSize: "0.8125rem", color: "var(--md-on-surface-variant)" }}>
           Tap meals to select them, then merge into one entry.
@@ -174,7 +189,7 @@ export function MealList({ meals, onEdit, onDelete, onMerge }: Props) {
           key={meal.id}
           meal={meal}
           onEdit={onEdit}
-          onDelete={onDelete}
+          onDelete={handleDelete}
           mergeMode={mergeMode}
           selected={selected.has(meal.id)}
           onSelect={toggleSelect}

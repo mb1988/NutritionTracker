@@ -21,9 +21,9 @@ const CATEGORY_ICONS: Record<string, string> = {
 type Props = {
   initialValues?: MealFormValues;
   savedMeals?:    SavedMeal[];
-  onSubmit:       (values: MealFormValues) => void;
+  onSubmit:       (values: MealFormValues) => Promise<void> | void;
   onCancel?:      () => void;
-  onSaveTemplate?:(values: MealFormValues) => void;
+  onSaveTemplate?:(values: MealFormValues) => Promise<void> | void;
   onDeleteSaved?: (id: string) => void;
 };
 
@@ -78,6 +78,8 @@ export function MealForm({
   const [values, setValues] = useState<MealFormValues>(initialValues ?? EMPTY_FORM_VALUES);
   const [error,  setError]  = useState<string | null>(null);
   const [saved,  setSaved]  = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [justAdded, setJustAdded] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(!isEditing);
 
   // AI estimation state
@@ -220,8 +222,15 @@ export function MealForm({
     void handleBarcodeConfirmFlow(barcode);
   }
 
-  function handleSubmit(e: FormEvent) {
+  useEffect(() => {
+    if (!justAdded) return;
+    const timer = window.setTimeout(() => setJustAdded(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [justAdded]);
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     if (!values.name.trim()) { setError("Meal name is required."); return; }
     if (values.calories < 0 || values.calories >= 10000) {
       setError("Calories must be 0 to 9999."); return;
@@ -231,19 +240,34 @@ export function MealForm({
       .some((k) => (values[k] as number) < 0);
     if (anyNeg) { setError("Macro values cannot be negative."); return; }
     setError(null);
-    onSubmit(values);
+    setSubmitting(true);
+    try {
+      await onSubmit(values);
+    } catch (err) {
+      // Keep what the user typed so they can retry.
+      setError(err instanceof Error ? err.message : "Could not save the meal. Please try again.");
+      return;
+    } finally {
+      setSubmitting(false);
+    }
     if (!isEditing) {
+      const addedName = values.name.trim();
       resetComposerState();
+      setJustAdded(addedName);
       return;
     }
     setSaved(false);
   }
 
-  function handleSaveTemplate() {
+  async function handleSaveTemplate() {
     if (!values.name.trim()) { setError("Enter a meal name before saving as template."); return; }
-    onSaveTemplate?.(values);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    try {
+      await onSaveTemplate?.(values);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the template.");
+    }
   }
 
   function handleClearForm() {
@@ -268,32 +292,31 @@ export function MealForm({
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: collapsed ? 0 : "var(--space-6)",
-          cursor: isEditing ? undefined : "pointer",
-          userSelect: isEditing ? undefined : "none",
         }}
-        onClick={isEditing ? undefined : () => setCollapsed((c) => !c)}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-          {!isEditing && (
-            <span style={{
-              fontSize: "0.75rem",
-              transition: "transform 0.2s ease",
-              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
-              display: "inline-block",
-            }}>
-              ▼
-            </span>
-          )}
-          <div>
-            <h2 style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "-0.025em" }}>
-              {isEditing ? "✏️ Edit meal" : "➕ Log meal"}
-            </h2>
-            {isEditing && (
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flex: 1 }}>
+          {!isEditing ? (
+            <button
+              type="button"
+              className="section-toggle"
+              onClick={() => setCollapsed((c) => !c)}
+              aria-expanded={!collapsed}
+            >
+              <span className={collapsed ? "chevron" : "chevron chevron--open"} aria-hidden="true">▾</span>
+              <h2>Log meal</h2>
+              {collapsed && justAdded && <span className="section-toggle__note">✓ Added {justAdded}</span>}
+              {collapsed && !justAdded && <span className="section-toggle__hint">Scan, describe or search</span>}
+            </button>
+          ) : (
+            <div>
+              <h2 style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "-0.025em" }}>
+                ✏️ Edit meal
+              </h2>
               <p style={{ fontSize: "0.75rem", color: "var(--md-primary-container)", marginTop: 3, fontWeight: 600 }}>
                 Update the details below, then save when you&apos;re ready.
               </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         {isEditing && onCancel && (
           <button type="button" className="btn-ghost btn-sm" onClick={onCancel}>✕ Cancel</button>
@@ -582,6 +605,10 @@ export function MealForm({
               </div>
             </div>
 
+            {justAdded && (
+              <div className="alert-success">✓ Added {justAdded}</div>
+            )}
+
             {/* Error */}
             {error && (
               <div className="alert-error"><span>⚠️</span><span>{error}</span></div>
@@ -590,20 +617,20 @@ export function MealForm({
             {/* Actions */}
             <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-3)" }}>
               <div className="row gap-3">
-                <button type="submit" className="btn-primary">
-                  {isEditing ? "Save changes" : "Add meal"}
+                <button type="submit" className="btn-primary" disabled={submitting}>
+                  {submitting ? "Saving…" : isEditing ? "Save changes" : "Add meal"}
                 </button>
                 {!isEditing && (
                   <button type="button" className="btn-ghost" onClick={handleClearForm}>Clear form</button>
                 )}
               </div>
-              {isEditing && onSaveTemplate && (
+              {onSaveTemplate && (
                 <button
                   type="button"
                   className={saved ? "btn-tonal btn-sm" : "btn-ghost btn-sm"}
                   onClick={handleSaveTemplate}
                 >
-                  {saved ? "✓ Saved!" : isEditing ? "Save as template" : "Save template"}
+                  {saved ? "✓ Saved!" : "Save as template"}
                 </button>
               )}
             </div>

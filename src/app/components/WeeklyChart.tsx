@@ -5,11 +5,11 @@ import {
   ResponsiveContainer, Cell, ReferenceLine, CartesianGrid,
 } from "recharts";
 import { NUTRITION_METRICS, type DailyGoals, type SelectableMetricKey } from "@/app/types";
-import { type ApiDay } from "@/app/hooks/useNutritionData";
-import { type TimePeriod, getDateRangeForPeriod, getPeriodLabel, aggregateData } from "@/app/components/TimePeriodSelector";
+import { type ApiDaySummary } from "@/app/hooks/useNutritionData";
+import { type TimePeriod, getDateRangeForPeriod, aggregateData } from "@/app/components/TimePeriodSelector";
 
 type Props = {
-  allDays: ApiDay[];
+  allDays: ApiDaySummary[];
   selectedDate: string;
   goals: DailyGoals;
   metric: SelectableMetricKey;
@@ -17,26 +17,23 @@ type Props = {
   onSelectDate: (date: string) => void;
 };
 
-function shortDay(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("en-GB", { weekday: "short" });
-}
-
 const CustomTooltip = ({ active, payload, label, metric }: {
   active?: boolean;
-  payload?: { value: number }[];
+  payload?: { value: number; payload: { count: number; date: string } }[];
   label?: string;
   metric?: SelectableMetricKey;
 }) => {
   if (!active || !payload?.length) return null;
   const unit = metric ? NUTRITION_METRICS[metric].unit : "";
-  const value = payload[0].value;
+  const { value, payload: entry } = payload[0];
+  const dateLabel = new Date(`${entry.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   return (
     <div className="chart-tooltip">
-      <p className="chart-tooltip__label">{label}</p>
+      <p className="chart-tooltip__label">{label} · {dateLabel}</p>
       <p className="chart-tooltip__value">
-        {unit === "kcal" || unit === "mg" ? Math.round(value) : Math.round(value * 10) / 10}
-        {unit}
+        {entry.count === 0
+          ? "Not logged"
+          : <>{unit === "kcal" || unit === "mg" ? Math.round(value) : Math.round(value * 10) / 10}{unit}</>}
       </p>
     </div>
   );
@@ -52,12 +49,19 @@ function getMetricStatusColor(value: number, goal: number, reverse: boolean, isS
   return isSelected ? "#de7c74" : "#7c5854";
 }
 
+const PERIOD_TITLES: Record<TimePeriod, string> = {
+  "1week": "1 week",
+  "1month": "1 month",
+  "3months": "3 months",
+  "6months": "6 months",
+};
+
 export function WeeklyChart({ allDays, selectedDate, goals, metric, timePeriod, onSelectDate }: Props) {
   const days = getDateRangeForPeriod(timePeriod);
   const metricConfig = NUTRITION_METRICS[metric];
   const goal = goals[metric];
   const byDate = new Map(allDays.map((day) => [day.date, {
-    [metricConfig.apiTotalKey]: day[metricConfig.apiTotalKey as keyof ApiDay],
+    [metricConfig.apiTotalKey]: day[metricConfig.apiTotalKey as keyof ApiDaySummary],
   }]));
 
   const aggregatedData = aggregateData(days, byDate, metricConfig.apiTotalKey, timePeriod);
@@ -68,19 +72,10 @@ export function WeeklyChart({ allDays, selectedDate, goals, metric, timePeriod, 
     }
   }
 
-  const getPeriodLabel = (period: TimePeriod): string => {
-    switch (period) {
-      case "1week": return "1 Week";
-      case "1month": return "1 Month";
-      case "3months": return "3 Months";
-      case "6months": return "6 Months";
-    }
-  };
-
   return (
     <div className="card weekly-chart">
       <div className="card-header">
-        <h2 style={{ fontWeight: 800 }}>{getPeriodLabel(timePeriod)} Overview</h2>
+        <h2 style={{ fontWeight: 800 }}>{PERIOD_TITLES[timePeriod]} overview</h2>
         <span className="badge-pill">{metricConfig.shortLabel}</span>
       </div>
       <div style={{ padding: "0 var(--space-5) var(--space-6)" }}>
@@ -105,6 +100,7 @@ export function WeeklyChart({ allDays, selectedDate, goals, metric, timePeriod, 
               strokeDasharray="5 4"
               strokeWidth={1.5}
               strokeOpacity={0.7}
+              ifOverflow="extendDomain"
             />
             <Bar
               dataKey="value"
@@ -125,7 +121,7 @@ export function WeeklyChart({ allDays, selectedDate, goals, metric, timePeriod, 
         </ResponsiveContainer>
         <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.6875rem", color: "var(--md-on-surface-variant)", marginTop: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
           <span style={{ display: "inline-block", width: 24, height: 3, borderRadius: 9999, background: "#de7c74", opacity: 0.7 }} />
-          Goal: {goal}{metricConfig.unit} · tap bar to navigate
+          Goal: {goal}{metricConfig.unit} · {timePeriod === "1week" ? "tap a bar to open that day" : "bars average logged days"}
         </p>
       </div>
     </div>
