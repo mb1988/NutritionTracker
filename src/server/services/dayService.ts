@@ -108,26 +108,40 @@ export async function updateDaySteps(
   });
 }
 
-/** Deletes a day and all its meals (cascade). */
-export async function deleteDay(userId: string, date: string) {
+/** Updates (or creates) the water intake for a day, in millilitres. */
+export async function updateDayWater(userId: string, date: string, waterMl: number) {
   validateDate(date);
-  await prisma.day.deleteMany({
-    where: { userId, date },
-  });
-}
 
-/** Returns all days for a user that have at least one meal or logged steps, ordered newest first. */
-export async function getAllDays(userId: string) {
-  return prisma.day.findMany({
-    where: {
-      userId,
-      OR: [
-        { meals: { some: {} } },
-        { totalSteps: { gt: 0 } },
-      ],
-    },
-    orderBy: { date: "desc" },
+  return prisma.day.upsert({
+    where:  { userId_date: { userId, date } },
+    update: { totalWaterMl: waterMl },
+    create: { userId, date, totalWaterMl: waterMl },
     include: { meals: { orderBy: { createdAt: "asc" } } },
   });
 }
 
+/** Days worth listing: at least one meal, or some steps or water logged. */
+const LOGGED_DAY_FILTER = {
+  OR: [
+    { meals: { some: {} } },
+    { totalSteps: { gt: 0 } },
+    { totalWaterMl: { gt: 0 } },
+  ],
+};
+
+/**
+ * Returns all logged days for a user without their meals, newest first.
+ *
+ * History cards and trend charts only need the day totals and a meal count;
+ * shipping every meal made this payload several megabytes for long histories.
+ */
+export async function getAllDaySummaries(userId: string) {
+  const days = await prisma.day.findMany({
+    where: { userId, ...LOGGED_DAY_FILTER },
+    orderBy: { date: "desc" },
+    omit: { userId: true, createdAt: true, updatedAt: true },
+    include: { _count: { select: { meals: true } } },
+  });
+
+  return days.map(({ _count, ...day }) => ({ ...day, mealCount: _count.meals }));
+}

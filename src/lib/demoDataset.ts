@@ -475,6 +475,40 @@ export function buildDemoDataset(): DemoDay[] {
   return days.sort((a, b) => a.offset - b.offset);
 }
 
+/**
+ * Water intake for a demo date, in 250 ml glasses. Seeded separately from the
+ * meal generator so adding it did not reshuffle any existing demo meals.
+ */
+export function demoWaterMlForDate(date: string): number {
+  const rng = mulberry32(seedFromString(`${date}:water`));
+  const glasses = 4 + Math.floor(rng() * 6); // 4–9 glasses
+  return glasses * 250;
+}
+
+/** How far back the demo weight log goes. */
+export const DEMO_WEIGHT_DAYS = 90;
+
+/**
+ * Demo weigh-ins for roughly five days a week over the last DEMO_WEIGHT_DAYS,
+ * drifting gently down from about 82 kg with day-to-day noise.
+ */
+export function buildDemoWeights(): { offset: number; weightKg: number }[] {
+  const entries: { offset: number; weightKg: number }[] = [];
+
+  for (let offset = -DEMO_WEIGHT_DAYS; offset <= 0; offset++) {
+    const date = demoDateForOffset(offset);
+    const rng = mulberry32(seedFromString(`${date}:weight`));
+    if (offset !== 0 && rng() < 0.3) continue;
+
+    const progress = (offset + DEMO_WEIGHT_DAYS) / DEMO_WEIGHT_DAYS;
+    const trend = 82 - progress * 2.6;
+    const noise = (rng() - 0.5) * 0.8;
+    entries.push({ offset, weightKg: round(trend + noise, 1) });
+  }
+
+  return entries;
+}
+
 /** Day-level snapshot totals for a demo day (matches the Day model columns). */
 export function demoDayTotals(meals: readonly DemoMeal[]): DemoDayTotals {
   const sum = (key: keyof Omit<DemoMeal, "name" | "category">) =>

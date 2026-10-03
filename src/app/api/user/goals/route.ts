@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { DEFAULT_GOALS } from "@/app/types";
 import { getSessionUserId, handleApiError } from "@/server/http";
-import { updateGoalsSchema } from "@/server/contracts/goals";
+import { getGoals, saveGoals } from "@/server/services/goalsService";
 
 export async function GET() {
   try {
     const userId = await getSessionUserId();
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { goals: true },
-    });
-    const saved = user?.goals ? (JSON.parse(user.goals) as object) : {};
-    const goals = { ...DEFAULT_GOALS, ...saved };
-    return NextResponse.json(goals);
+    return NextResponse.json(await getGoals(userId));
   } catch (error) {
     return handleApiError(error);
   }
@@ -22,13 +14,8 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   try {
     const userId = await getSessionUserId();
-    const body = await request.json();
-    const goals = updateGoalsSchema.parse(body);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { goals: JSON.stringify(goals) },
-    });
-    return NextResponse.json({ ok: true });
+    const goals = await saveGoals(userId, await request.json());
+    return NextResponse.json({ ok: true, goals });
   } catch (error) {
     return handleApiError(error);
   }

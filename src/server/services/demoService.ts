@@ -4,9 +4,11 @@ import { DEMO_USER_ID, DEMO_USER_EMAIL } from "@/lib/demo";
 import {
   DEMO_SAVED_MEALS,
   buildDemoDataset,
+  buildDemoWeights,
   demoDateForOffset,
   demoDayTotals,
   demoMealTimestamp,
+  demoWaterMlForDate,
 } from "@/lib/demoDataset";
 
 /**
@@ -54,6 +56,7 @@ export async function resetDemoData(): Promise<void> {
   await prisma.meal.deleteMany({ where: { userId: DEMO_USER_ID } });
   await prisma.day.deleteMany({ where: { userId: DEMO_USER_ID } });
   await prisma.savedMeal.deleteMany({ where: { userId: DEMO_USER_ID } });
+  await prisma.weightEntry.deleteMany({ where: { userId: DEMO_USER_ID } });
 
   // 3. Build days + meals
   const dayRows: Prisma.DayCreateManyInput[] = [];
@@ -68,6 +71,8 @@ export async function resetDemoData(): Promise<void> {
       userId: DEMO_USER_ID,
       date,
       totalSteps: day.steps,
+      // Only past days and today have water logged; nobody pre-logs drinks.
+      totalWaterMl: day.offset <= 0 ? demoWaterMlForDate(date) : 0,
       ...demoDayTotals(day.meals),
     });
 
@@ -85,7 +90,15 @@ export async function resetDemoData(): Promise<void> {
   await insertInChunks(dayRows, (chunk) => prisma.day.createMany({ data: chunk }));
   await insertInChunks(mealRows, (chunk) => prisma.meal.createMany({ data: chunk }));
 
-  // 4. Create saved meal templates
+  // 4. Weight log
+  await prisma.weightEntry.createMany({
+    data: buildDemoWeights().map(({ offset, weightKg }) => {
+      const date = demoDateForOffset(offset);
+      return { id: `demo-weight-${date}`, userId: DEMO_USER_ID, date, weightKg };
+    }),
+  });
+
+  // 5. Create saved meal templates
   await prisma.savedMeal.createMany({
     data: DEMO_SAVED_MEALS.map((meal, index) => ({
       id: `demo-saved-${index + 1}`,

@@ -13,5 +13,7 @@ export const updateGoalsSchema = z.object(
     ]),
   ) as Record<keyof typeof DEFAULT_GOALS, z.ZodNumber>,
 ).extend({
+  // Added after launch: clients cached before it existed don't send it.
+  waterGoal: z.number().finite().min(0).max(20000).default(DEFAULT_GOALS.waterGoal),
   stepCalorieAdjustment: z.boolean().default(DEFAULT_GOALS.stepCalorieAdjustment),
 });

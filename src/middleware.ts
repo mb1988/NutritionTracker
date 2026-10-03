@@ -25,9 +25,10 @@ export async function middleware(req: NextRequest) {
  *  - /api/demo/*     (demo setup — must be reachable pre-auth)
  *  - /api/steps/sync (token-authenticated webhook for phone step sync)
  *  - /_next/*        (Next.js static files)
- *  - /favicon.ico
+ *  - /favicon.ico, /manifest.json, /icons/* (PWA assets — the browser fetches
+ *    these without credentials, including from the login page)
  */
 export const config = {
-  matcher: ["/((?!login|api/auth|api/demo|api/steps/sync|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|api/auth|api/demo|api/steps/sync|_next/static|_next/image|favicon.ico|manifest.json|icons/).*)"],
 };
 
