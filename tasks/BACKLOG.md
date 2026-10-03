@@ -92,11 +92,13 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 6 — Streak tracking (Low effort, motivational hook)
+## ✅ TASK 6 — Streak tracking (Low effort, motivational hook) *(done)*
 
 **Problem:** No feedback on consistency. "You've logged X days in a row" is a proven retention feature.
 
 **What to build:**
+> Implemented client-side in `src/app/lib/streak.ts` instead: "today" depends on the user's timezone, which the server doesn't know.
+
 - Add `getStreak(userId: string): Promise<number>` to `src/server/services/dayService.ts`:
   - Query all `Day` rows for the user ordered by date desc
   - Walk backwards from today (or yesterday if today has no entry yet) counting consecutive days that have at least one meal logged (`meals.length > 0` or `totalCalories > 0`)
@@ -134,7 +136,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 8 — Water intake tracking (Low effort, frequently expected)
+## ✅ TASK 8 — Water intake tracking (Low effort, frequently expected) *(done)*
 
 **Problem:** Every mainstream nutrition app tracks water. It's a daily habit that pairs naturally with meal logging.
 
@@ -164,7 +166,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 9 — Data export as CSV (Low effort, user trust)
+## ✅ TASK 9 — Data export as CSV (Low effort, user trust) *(done)*
 
 **Problem:** Users cannot get their data out. "Export my data" is a basic expectation and a trust signal.
 
@@ -183,7 +185,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 10 — Google OAuth (Wider audience)
+## ✅ TASK 10 — Google OAuth (Wider audience) *(done)*
 
 **Problem:** GitHub login is developer-facing. Google OAuth lets regular users sign in without needing a GitHub account.
 
@@ -200,7 +202,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 11 — Body weight log (Medium effort, high context value)
+## ✅ TASK 11 — Body weight log (Medium effort, high context value) *(done)*
 
 **Problem:** Without weight data, calorie and protein goals have no personal baseline. Even a simple log adds meaningful context to trends.
 
@@ -256,7 +258,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 13 — Goals API route test coverage (Testing)
+## ✅ TASK 13 — Goals API route test coverage (Testing) *(done)*
 
 **Problem:** `src/app/api/user/goals/route.ts` (added in Task 1) has no tests. The service layer pattern used elsewhere has unit tests; this route has none.
 
@@ -273,7 +275,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 14 — Goals loading skeleton in GoalsPanel (UX)
+## ✅ TASK 14 — Goals loading skeleton in GoalsPanel (UX) *(done)*
 
 **Problem:** On first load for a real user, `useGoals` shows `DEFAULT_GOALS` for ~200 ms while the server fetch is in flight. This causes a brief flash of default values before the real goals appear.
 
@@ -288,7 +290,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 15 — Prisma config file migration (Cleanup)
+## ✅ TASK 15 — Prisma config file migration (Cleanup) *(done)*
 
 **Problem:** `package.json#prisma` is deprecated and will be removed in Prisma 7. A deprecation warning fires on every `prisma` CLI call.
 
@@ -302,7 +304,7 @@ Tasks are ordered: bugs first, then features by value/effort ratio.
 
 ---
 
-## TASK 16 — Redis-backed rate limiting for multi-instance deploys (Scalability)
+## ✅ TASK 16 — Redis-backed rate limiting for multi-instance deploys (Scalability) *(done)*
 
 **Problem:** Task 4's in-memory rate limiter resets per-process. If Railway scales to multiple instances, each instance has its own counter and the per-user limit is multiplied by the instance count.
 
